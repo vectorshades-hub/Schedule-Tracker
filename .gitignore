@@ -1,0 +1,31 @@
+# ── Dependencies / build output ─────────────────────────
+node_modules/
+.next/
+out/
+
+# ── Env files (both server/ and client/, plus any future ones) ──
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# ── Uploaded / generated data ────────────────────────────
+# `**/` is needed here — a plain `uploads/backups/*` would only match a
+# root-level uploads/ folder, but the real one is server/uploads/ (UPLOAD_DIR
+# is relative to the server's own cwd, i.e. server/, not the repo root).
+**/uploads/hold_images/*
+!**/uploads/hold_images/.gitkeep
+**/uploads/onhold_attachments/*
+!**/uploads/onhold_attachments/.gitkeep
+**/uploads/backups/*
+!**/uploads/backups/.gitkeep
+
+# ── Logs ─────────────────────────────────────────────────
+*.log
+npm-debug.log*
+
+# ── OS / editor cruft ────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

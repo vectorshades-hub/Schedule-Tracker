@@ -1,0 +1,29 @@
+{
+  "name": "schedule-tracker-server",
+  "version": "1.0.0",
+  "description": "Schedule Tracker API — Express + MongoDB",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "migrate": "node scripts/migrate-postgres-to-mongo.js"
+  },
+  "dependencies": {
+    "connect-mongo": "^5.1.0",
+    "cors": "^2.8.5",
+    "csv-parse": "^7.0.2",
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "mongoose": "^8.5.0",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4",
+    "pg": "^8.12.0"
+  }
+}

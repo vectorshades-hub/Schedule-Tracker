@@ -1,0 +1,1376 @@
+/* ─────────────────────────────────────────────────────────────────
+   Design system ported 1:1 from the Flask app's base.html + every
+   page template's own <style> block (colors, gradients, shadows,
+   radii and type scale copied verbatim, not approximated).
+   ───────────────────────────────────────────────────────────────── */
+
+:root {
+  --navy: #16213e;
+  --blue: #4da6ff;
+  --bg: #f4f6fb;
+}
+
+html { min-height: 100%; }
+body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: #1a1a2e;
+  font-family: "Segoe UI", sans-serif;
+  font-size: 0.9rem;
+}
+
+/* ── Login page ─────────────────────────────────────── */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--navy);
+  padding: 1rem;
+}
+.login-card {
+  background: #fff;
+  border-radius: 28px;
+  padding: 2.75rem 2.5rem 2rem;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  text-align: center;
+}
+.login-logo-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 0.35rem;
+}
+.login-title {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: var(--blue);
+  margin: 0;
+}
+.login-subtitle {
+  color: #888;
+  font-size: 0.92rem;
+  margin-bottom: 1.75rem;
+}
+.login-field {
+  text-align: left;
+  margin-bottom: 1.1rem;
+}
+.login-field label {
+  display: block;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #1a1a2e;
+  margin-bottom: 0.4rem;
+}
+.login-field input,
+.login-field .sd-wrap input {
+  width: 100%;
+  border: 1.5px solid #e3e6ee;
+  border-radius: 12px;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.login-field input:focus,
+.login-field .sd-wrap input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(77, 166, 255, 0.15);
+}
+.login-button {
+  width: 100%;
+  background: var(--navy);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 0.75rem;
+  font-weight: 700;
+  font-size: 1rem;
+  margin-top: 0.5rem;
+  transition: background 0.15s ease;
+}
+.login-button:hover:not(:disabled) { background: #1a2d5a; }
+.login-button:disabled { opacity: 0.7; }
+.login-footer {
+  margin-top: 1.5rem;
+  color: #9aa2b1;
+  font-size: 0.82rem;
+}
+
+/* ── Navbar (base.html) ─────────────────────────────── */
+.st-navbar {
+  background: var(--navy) !important;
+  color: #fff;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+  /* border-top: 3px solid var(--blue); */
+}
+.st-navbar a {
+  color: #cdd9f5 !important;
+  text-decoration: none;
+  font-size: 0.88rem;
+}
+.st-navbar a:hover { color: var(--blue) !important; }
+.st-brand-logo {
+  height: 38px;
+  width: 38px;
+  object-fit: contain;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.st-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.st-brand-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.3px;
+}
+.st-brand-sub {
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+}
+.st-footer {
+  background: var(--navy);
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  padding: 14px 20px;
+  font-size: 0.76rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+.st-footer-sep { margin: 0 10px; color: rgba(255, 255, 255, 0.25); }
+.st-footer-bolt { color: var(--blue); margin-right: 2px; }
+
+/* ── Status badges (tag → color), ported verbatim from base.html ── */
+.badge-overdue { background: #e74c3c; color: #fff; }
+.badge-duesoon { background: #e67e22; color: #fff; }
+.badge-ontrack { background: #27ae60; color: #fff; }
+.badge-completed { background: #3498db; color: #fff; }
+.badge-completed_overdue { background: #135d8f; color: #fff; }
+.badge-nodue { background: #95a5a6; color: #fff; }
+/* index.html locally overrides the base badge-hold with this lighter lavender —
+ * that's the one that actually wins/renders in the real app (confirmed against
+ * a live screenshot), so it's the only .badge-hold defined here. */
+.badge-hold { background: #e8d5ff; color: #5b21b6; }
+.badge-invalid { background: #6c757d; color: #fff; }
+.badge-purple { background: #9b59b6; color: #fff; }
+
+tr.overdue td { background: #ffe5e5 !important; }
+tr.duesoon td { background: #fff3e0 !important; }
+tr.ontrack td { background: #e8f8ee !important; }
+tr.completed td { background: #e3f2fd !important; }
+tr.completed_overdue td { background: #d7efff !important; }
+tr.nodue td { background: #f5f5f5 !important; }
+tr.hold td { background: #f3e8ff !important; }
+
+/* ── Role badges (base.html Add-User modal) ──────────── */
+.role-badge-admin { background: #ffc107; color: #000; }
+.role-badge-management { background: #0dcaf0; color: #000; }
+.role-badge-team_lead { background: #198754; color: #fff; }
+.role-badge-qaqc { background: #7c3aed; color: #fff; }
+.role-badge-user { background: #6c757d; color: #fff; }
+
+/* ── Role pills (users.html table — distinct pastel palette) ── */
+.role-pill { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; }
+.role-pill-admin { background: #fee2e2; color: #991b1b; }
+.role-pill-management { background: #fef3c7; color: #92400e; }
+.role-pill-team_lead { background: #dbeafe; color: #1e40af; }
+.role-pill-qaqc { background: #f3e8ff; color: #6b21a8; }
+.role-pill-user { background: #f0fdf4; color: #166534; }
+
+/* ── Layout helpers ─────────────────────────────────── */
+.card-form {
+  background: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 1.1rem 1.25rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+  margin-bottom: 1rem;
+}
+.section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.table-wrap {
+  /* max-height: 62vh; */
+  overflow: auto;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
+}
+.table-wrap table { font-size: 0.82rem; margin-bottom: 0; }
+.table-wrap table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--navy);
+  color: #fff;
+  z-index: 2;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.table-wrap table td { vertical-align: middle; }
+.table-wrap.theme-indigo table thead th { background: #1a237e; }
+.table-wrap.theme-emerald table thead th { background: #0f3d2e; }
+.table-wrap.theme-deepblue table thead th { background: #0f3460; }
+.table-wrap.theme-navyblue table thead th { background: #16213e; }
+#editPanel {
+  display: none;
+  background: #fffde7;
+  border-left: 4px solid #f0c040;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+#editPanel.visible { display: block; }
+
+/* ── Hero banner (reused across 8 Flask pages — only the gradient differs) ── */
+.hero-banner {
+  border-radius: 14px;
+  padding: 20px 26px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.hero-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.hero-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+.hero-title { font-size: 1.1rem; font-weight: 700; color: #fff; letter-spacing: 0.3px; }
+.hero-meta { font-size: 0.76rem; margin-top: 2px; }
+.hero-right { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.hero-navy {
+  background: linear-gradient(135deg, #16213e 0%, #1a2d5a 100%);
+  box-shadow: 0 4px 20px rgba(22, 33, 62, 0.18);
+}
+.hero-navy .hero-icon { background: rgba(77, 166, 255, 0.18); border: 1px solid rgba(77, 166, 255, 0.28); }
+.hero-navy .hero-meta { color: #8aafdf; }
+
+.hero-navyblue {
+  background: linear-gradient(135deg, #16213e 0%, #1a2a5e 60%, #1e3a7a 100%);
+  box-shadow: 0 4px 20px rgba(22, 33, 62, 0.22);
+}
+.hero-navyblue .hero-icon { background: rgba(77, 166, 255, 0.18); border: 1px solid rgba(77, 166, 255, 0.28); }
+.hero-navyblue .hero-meta { color: #8aafdf; }
+
+.hero-emerald {
+  background: linear-gradient(135deg, #0f3d2e 0%, #155a3e 60%, #1a6e4a 100%);
+  box-shadow: 0 4px 20px rgba(15, 61, 46, 0.22);
+}
+.hero-emerald .hero-icon { background: rgba(100, 220, 140, 0.15); border: 1px solid rgba(100, 220, 140, 0.28); }
+.hero-emerald .hero-meta { color: #7fdfb0; }
+
+.hero-deepblue {
+  background: linear-gradient(135deg, #0f3460 0%, #16213e 60%, #1a2d5a 100%);
+  box-shadow: 0 4px 20px rgba(15, 52, 96, 0.22);
+}
+.hero-deepblue .hero-icon { background: rgba(100, 180, 255, 0.15); border: 1px solid rgba(100, 180, 255, 0.25); }
+.hero-deepblue .hero-meta { color: #7fb3df; }
+
+.hero-indigo {
+  background: linear-gradient(135deg, #1a237e 0%, #283593 60%, #3949ab 100%);
+  box-shadow: 0 4px 20px rgba(26, 35, 126, 0.22);
+}
+.hero-indigo .hero-icon { background: rgba(100, 150, 255, 0.18); border: 1px solid rgba(100, 150, 255, 0.3); }
+.hero-indigo .hero-meta { color: #9fa8da; }
+
+/* ── Stat pills (users/completed-log/notifications/request-log/editing-log/drilldowns) ── */
+.stats-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.stat-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 7px 14px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+  font-size: 0.8rem;
+  border: 2px solid transparent;
+  transition: all 0.15s;
+}
+.stat-pill.clickable { cursor: pointer; }
+.stat-pill.clickable:hover { border-color: #0f3d2e; }
+.stat-pill.active { border-color: #0f3d2e; background: #f0fff5; }
+.sp-num { font-size: 1.05rem; font-weight: 700; line-height: 1; }
+.sp-lbl { color: #777; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.4px; }
+
+/* ── Filter bar (reused verbatim across 7 pages) ─────── */
+.filter-bar {
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px 16px;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
+  margin-bottom: 12px;
+}
+.filter-bar .form-control, .filter-bar .form-select { font-size: 0.82rem; }
+
+/* ── Back-link pill ───────────────────────────────────── */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--navy);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 7px;
+  padding: 4px 12px;
+  background: #fff;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.08);
+  transition: background 0.14s;
+}
+.back-link:hover { background: #eef2fb; color: var(--navy); }
+
+/* ── Export button (completed-log green solid CTA) ───── */
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #1a6e4a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.export-btn:hover { background: #155a3e; color: #fff; }
+
+/* ── QAQC pill toggle ───────────────────────────────── */
+.qaqc-pill { display: inline-flex; border-radius: 20px; overflow: hidden; border: 1.5px solid #dee2e6; background: #f8f9fa; }
+.qp-btn { padding: 3px 10px; font-size: 0.72rem; font-weight: 700; border: none; background: transparent; cursor: pointer; transition: all 0.15s; color: #999; }
+.qp-active-yes { background: #198754 !important; color: #fff !important; }
+.qp-active-no { background: #dc3545 !important; color: #fff !important; }
+.qp-inactive { background: transparent; color: #999; }
+.qp-yes-badge { background: #d1fae5; color: #065f46; display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+.qp-no-badge { background: #fee2e2; color: #991b1b; display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+
+/* ── Completed Projects Log table ─────────────────────── */
+/* Matches/outranks Bootstrap's `.table-sm > :not(caption) > * > *` (same
+   0-1-1 specificity as a plain `.completed-log-table td`, so it was a
+   coin-flip on load order) — this selector is more specific and always wins. */
+.completed-log-table.table > :not(caption) > * > * { padding: 14px 12px; }
+.completed-log-table tbody tr { transition: background 0.1s; }
+.completed-log-table td.cl-primary { font-weight: 600; color: #1f2937; }
+.completed-log-table td.cl-muted { color: #8792a2; }
+.completed-log-table td.cl-id { font-variant-numeric: tabular-nums; color: #8792a2; font-weight: 600; }
+.type-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.type-pill-fab { background: #dbeafe; color: #1d4ed8; }
+.type-pill-ofa { background: #fef3c7; color: #92400e; }
+.type-pill-reapproval { background: #ede9fe; color: #5b21b6; }
+.type-pill-revision { background: #fee2e2; color: #991b1b; }
+.type-pill-review { background: #dcfce7; color: #166534; }
+.type-pill-field { background: #e2e8f0; color: #334155; }
+.type-pill-default { background: #f1f5f9; color: #475569; }
+
+/* ── On/off switch (QA Done / Billable / Invoice Released) ── */
+.switch-toggle {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 21px;
+  border: none;
+  border-radius: 22px;
+  background: #d7dbe0;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.18s ease;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.switch-toggle.on { background: #22c55e; }
+.switch-toggle:disabled { cursor: default; opacity: 0.55; }
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 17px;
+  height: 17px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.18s ease;
+}
+.switch-toggle.on .switch-thumb { transform: translateX(17px); }
+
+/* ── Percentage cell (read-only badge for non-admin/management) ────── */
+.percentage-badge { background: #e0e7ff; color: #3730a3; display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+
+/* ── Toggle switches (index/management/drilldowns) ──── */
+.tog { position: relative; width: 34px; height: 18px; flex-shrink: 0; display: inline-block; }
+.tog input { opacity: 0; width: 0; height: 0; position: absolute; }
+.tog-slider { position: absolute; inset: 0; background: #dee2e6; border-radius: 18px; cursor: pointer; transition: 0.2s; }
+.tog-slider:before { content: ""; position: absolute; width: 12px; height: 12px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+.tog input:checked + .tog-slider { background: #198754; }
+.tog input:checked + .tog-slider:before { transform: translateX(16px); }
+.tog.disabled .tog-slider { cursor: not-allowed; opacity: 0.55; }
+
+/* ── Info button ──────────────────────────────────────── */
+.info-btn { background: none; border: none; padding: 1px 3px; cursor: pointer; font-size: 0.82rem; color: #6366f1; opacity: 0.7; transition: opacity 0.15s; }
+.info-btn:hover { opacity: 1; }
+
+/* ── Searchable dropdown ────────────────────────────── */
+.sd-wrap { position: relative; }
+.sd-list {
+  position: absolute;
+  z-index: 50;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #ced4da;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  margin-top: 2px;
+}
+.sd-item { padding: 6px 10px; cursor: pointer; font-size: 0.82rem; border-bottom: 1px solid #f0f0f0; }
+.sd-item:last-child { border-bottom: none; }
+.sd-item.active, .sd-item:hover { background: #e8f0fe; color: var(--navy); }
+
+/* ── Team pills (project/client links use the same underline pattern) ── */
+.team-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 2px solid #dee2e6;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #555;
+  background: #fff;
+  transition: all 0.15s;
+  user-select: none;
+}
+.team-btn:hover { border-color: var(--blue); background: #e8f0fe; }
+.team-btn.selected { border-color: var(--navy); background: var(--navy); color: #fff; }
+
+.proj-link, .client-link {
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1.5px solid #4da6ff66;
+  transition: color 0.14s, border-color 0.14s;
+}
+.proj-link { color: var(--navy); }
+.client-link { color: #1a6e3c; border-bottom-color: #4dc88c66; }
+.proj-link:hover, .client-link:hover { color: var(--blue); border-color: var(--blue); }
+.client-link:hover { color: #27ae60; border-color: #27ae60; }
+
+/* ── Sortable table headers ───────────────────────────── */
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable::after { content: " \2195"; font-size: 0.7rem; color: #aaa; }
+th.sort-asc::after { content: " \2191"; color: inherit; }
+th.sort-desc::after { content: " \2193"; color: inherit; }
+
+/* ── Generic modal (custom, no Bootstrap JS dependency) ── */
+.st-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: st-fade-in 0.2s ease;
+}
+.st-modal {
+  background: #fff;
+  border-radius: 12px;
+  max-width: 560px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  animation: st-slide-up 0.22s ease;
+}
+.st-modal-header {
+  padding: 0.85rem 1.25rem;
+  color: #fff;
+  background: var(--navy);
+  border-radius: 12px 12px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.st-modal-header h5 { color: #fff; }
+.st-modal-header .btn-close { filter: invert(1) grayscale(1) brightness(2); }
+.st-modal-header.header-purple { background: #7c3aed; }
+.st-modal-header.header-danger { background: #c0392b; }
+.st-modal-header.header-indigo { background: #1a237e; border-radius: 14px 14px 0 0; }
+.st-modal-header.header-gradient-blue { background: linear-gradient(135deg, #1e3a5f, #2563eb); }
+.st-modal-header.header-import-users { background: #1a3a6b; }
+.st-modal-header.header-bulk-birthday { background: #7c1034; }
+.st-modal-body { padding: 1.1rem 1.25rem; }
+.st-modal-footer { padding: 0.85rem 1.25rem; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+@keyframes st-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes st-slide-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── Upcoming & Overdue Deadlines popup ──────────────────── */
+.st-modal-header.header-deadlines {
+  background: linear-gradient(135deg, #0d1b34, #142a52);
+  align-items: flex-start;
+}
+.dp-header-inner { display: flex; gap: 0.75rem; align-items: flex-start; }
+.dp-header-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+.dp-header-title { font-size: 1.05rem; font-weight: 700; color: #fff; margin-bottom: 0.4rem; }
+.dp-header-sub { font-size: 0.78rem; color: #b9c4d6; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.15rem; }
+.st-modal-header.header-deadlines .btn-close {
+  background-color: rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  opacity: 1;
+  padding: 0.45rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  background-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.dp-pills { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.9rem 1.25rem 0.75rem; }
+.dp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.32rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.dp-pill-overdue { background: #fdeaea; color: #c0392b; border-color: #f6c9c9; }
+.dp-pill-today { background: #fff3e0; color: #c9760a; border-color: #fbdca0; }
+.dp-pill-tomorrow { background: #e7f7ee; color: #1a7a44; border-color: #bfe9d1; }
+.dp-pill-day3 { background: #e8f1fd; color: #1f5fbf; border-color: #c6dcf7; }
+
+.dp-scope { padding: 0 1.25rem 0.6rem; color: #6c757d; font-size: 0.8rem; }
+
+.dp-list { max-height: 55vh; overflow-y: auto; padding: 0 1.25rem 0.5rem; }
+.dp-section-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.9rem -1.25rem 0.6rem;
+  padding: 0.45rem 1.25rem;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+}
+.dp-list > div:first-child .dp-section-bar { margin-top: 0; }
+.dp-section-bar .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: currentColor; }
+.dp-section-bar-overdue { background: #fbe7e7; color: #c0392b; }
+.dp-section-bar-today { background: #fdeedc; color: #c9760a; }
+.dp-section-bar-tomorrow { background: #e3f6ea; color: #1a7a44; }
+.dp-section-bar-day3 { background: #e5f0fd; color: #1f5fbf; }
+
+.dp-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; background: #f5f6f8; border-radius: 10px; padding: 0.65rem 0.85rem; margin-bottom: 0.55rem; }
+.dp-row-main { min-width: 0; }
+.dp-row-project { font-weight: 700; font-size: 0.88rem; color: #1a2233; margin-bottom: 0.15rem; }
+.dp-row-submission { font-size: 0.76rem; color: #8a94a6; margin-bottom: 0.4rem; }
+.dp-row-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.dp-chip-client { background: #e8f1fd; color: #1f5fbf; font-size: 0.72rem; font-weight: 600; padding: 0.15rem 0.55rem; border-radius: 6px; }
+.dp-chip-team { color: #1a7a44; font-size: 0.76rem; font-weight: 600; }
+.dp-row-side { text-align: right; flex-shrink: 0; }
+.dp-row-num { font-size: 1.3rem; font-weight: 800; line-height: 1; }
+.dp-row-num-overdue { color: #e0453b; }
+.dp-row-num-today { color: #c9760a; }
+.dp-row-num-tomorrow { color: #1a7a44; }
+.dp-row-num-day3 { color: #1f5fbf; }
+.dp-row-desc { font-size: 0.7rem; color: #8a94a6; margin-top: 0.15rem; white-space: nowrap; }
+.dp-row-date { font-size: 0.7rem; color: #b0b6c0; margin-top: 0.1rem; }
+
+.dp-footer { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; width: 100%; }
+.dp-footer-note { font-size: 0.76rem; color: #8a94a6; display: flex; align-items: center; gap: 0.4rem; }
+.dp-footer-btn { background: #16233f; color: #fff; border: none; padding: 0.5rem 1.1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+.dp-footer-btn:hover { background: #223257; }
+
+/* ── Date filter buttons (joined segmented control) ──── */
+.date-btn-group { display: inline-flex; border-radius: 6px; overflow: hidden; border: 1px solid #dee2e6; }
+.date-btn {
+  border: none;
+  border-right: 1px solid #dee2e6;
+  background: #fff;
+  padding: 5px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #555;
+}
+.date-btn:last-child { border-right: none; }
+.date-btn.active { color: #fff !important; }
+.date-btn.active.yesterday { background: #dc3545; }
+.date-btn.active.today { background: #0d6efd; }
+.date-btn.active.tomorrow { background: #198754; }
+.date-btn:not(.active):hover.yesterday { background: #ffeded; color: #dc3545; }
+.date-btn:not(.active):hover.today { background: #e7f1ff; color: #0d6efd; }
+.date-btn:not(.active):hover.tomorrow { background: #e6f4ea; color: #198754; }
+
+/* ── Standalone "Custom" date-range button (sits before the group) ── */
+.date-btn.custom-toggle { border-radius: 6px; border: 1px solid #dee2e6; }
+.date-btn.active.custom { background: #6f42c1; }
+.date-btn:not(.active):hover.custom-toggle { background: #f2ecfb; color: #6f42c1; }
+
+/* ── Editing log type badges ──────────────────────────── */
+.badge-detail { background: #1a237e; color: #fff; }
+.badge-erection { background: #0f766e; color: #fff; }
+
+/* ── Editing log "done" completion tints ─────────────── */
+.done-detailed { background-color: #fef9c3 !important; }
+.done-checked { background-color: #dcfce7 !important; }
+.done-corrected { background-color: #ffedd5 !important; }
+.done-qccomment { background-color: #cffafe !important; }
+
+/* ── Access chip panel (editing log) ─────────────────── */
+.access-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  border: 1px solid #c5cae9;
+  background: #fff;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s;
+}
+.access-chip:hover { border-color: #7986cb; background: #eef0fb; }
+.access-chip.ac-checked { background: #e8eaf6; border-color: #5c6bc0; }
+.access-badge-default { background: #3949ab; color: #fff; font-size: 0.58rem; padding: 1px 5px; border-radius: 3px; margin-left: 2px; font-weight: 700; }
+.access-uploader-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  border: 1px solid #a5b4fc;
+  background: #eef2ff;
+  color: #3730a3;
+  font-weight: 600;
+}
+
+/* ── Notifications page ───────────────────────────────── */
+.notif-stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.notif-stat { background: #fff; border-radius: 12px; padding: 10px 26px; box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06); text-align: center; min-width: 96px; }
+.notif-stat-num { font-size: 1.5rem; font-weight: 800; color: var(--navy); line-height: 1.1; }
+.notif-stat-lbl { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #888; margin-top: 2px; }
+.notif-stat-added { background: #eafaf0; }
+.notif-stat-added .notif-stat-num, .notif-stat-added .notif-stat-lbl { color: #1a7431; }
+.notif-stat-updated { background: #fff4e5; }
+.notif-stat-updated .notif-stat-num, .notif-stat-updated .notif-stat-lbl { color: #b3620a; }
+.notif-stat-deleted { background: #fdeaea; }
+.notif-stat-deleted .notif-stat-num, .notif-stat-deleted .notif-stat-lbl { color: #c0392b; }
+
+.notif-filters { display: grid; grid-template-columns: repeat(4, 1fr) auto; gap: 12px; align-items: end; background: #fff; border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06); margin-bottom: 14px; }
+.notif-filter-label { display: block; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #8a94a6; margin-bottom: 6px; }
+.notif-clear-btn { display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid #dee2e6; background: #fff; color: #555; font-size: 0.85rem; cursor: pointer; }
+.notif-clear-btn:hover:not(:disabled) { background: #f8f9fa; border-color: #c3c9d3; }
+.notif-clear-btn:disabled { opacity: 0.5; cursor: default; }
+@media (max-width: 900px) { .notif-filters { grid-template-columns: 1fr 1fr; } }
+
+.notif-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.notif-grid .empty-state { grid-column: 1 / -1; }
+@media (max-width: 900px) { .notif-grid { grid-template-columns: 1fr; } }
+
+.notif-card2 { background: #fff; border-radius: 10px; padding: 14px 16px 12px; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06); border-left: 4px solid #dee2e6; transition: box-shadow 0.15s; }
+.notif-card2:hover { box-shadow: 0 3px 14px rgba(0, 0, 0, 0.1); }
+.notif-card2.action-add { border-left-color: #27ae60; }
+.notif-card2.action-add.unseen { background: #f6fffa; }
+.notif-card2.action-update { border-left-color: #e67e22; }
+.notif-card2.action-update.unseen { background: #fffcf5; }
+.notif-card2.action-completed { border-left-color: #3498db; }
+.notif-card2.action-completed.unseen { background: #f6fbff; }
+.notif-card2.action-delete { border-left-color: #e74c3c; }
+.notif-card2.action-delete.unseen { background: #fff8f8; }
+.notif-card2.action-other { border-left-color: #9b59b6; }
+.notif-card2.action-other.unseen { background: #fdf8ff; }
+
+.notif-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.notif-action-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.03em; }
+.notif-action-pill.action-add { background: #d7f5e3; color: #1a7431; }
+.notif-action-pill.action-update { background: #ffe8cc; color: #b3620a; }
+.notif-action-pill.action-completed { background: #d7ecfd; color: #1663ab; }
+.notif-action-pill.action-delete { background: #fbdada; color: #b3261e; }
+.notif-action-pill.action-other { background: #efd9fb; color: #6b1fa0; }
+.notif-user-icon { color: #aab2c0; font-size: 1rem; }
+.notif-time { font-size: 0.72rem; color: #9aa4b5; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+
+.notif-id-bar { background: #f5f6f8; border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; color: #333; margin-bottom: 10px; line-height: 1.7; }
+.notif-id-bar .nib-label { color: #8a94a6; font-weight: 700; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.03em; margin-right: 3px; }
+.notif-id-bar .nib-val { font-weight: 600; color: #1a2233; margin-right: 6px; }
+.notif-id-bar .nib-sep { color: #c3c9d3; margin-right: 6px; }
+
+.notif-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.notif-tile { background: #f0fff4; border-radius: 6px; padding: 6px 10px; }
+.notif-tile .nt-label { color: #888; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+.notif-tile .nt-val { color: #155724; font-weight: 600; font-size: 0.8rem; margin-top: 1px; }
+
+.notif-changes { display: flex; flex-direction: column; gap: 6px; }
+.notif-change-row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; flex-wrap: wrap; }
+.notif-change-field { min-width: 95px; font-weight: 700; color: #555; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.02em; }
+.change-old { color: #c0392b; background: #fdf0f0; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; text-decoration: line-through; }
+.change-new { color: #1a7431; background: #f0fdf4; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+
+.notif-card-footer { display: flex; justify-content: flex-start; align-items: center; margin-top: 10px; }
+.notif-seen-label { display: flex; align-items: center; gap: 4px; color: #1a7431; font-size: 0.76rem; font-weight: 600; }
+
+/* ── Completed log archiver badges ───────────────────── */
+.archived-by-auto { background: #e8d5f5; color: #4a0080; font-size: 0.67rem; padding: 2px 7px; border-radius: 4px; font-weight: 700; }
+.archived-by-user { background: #d4edda; color: #155724; font-size: 0.67rem; padding: 2px 7px; border-radius: 4px; font-weight: 700; }
+
+/* ── Request log: method/status badges + duration ────── */
+.method-badge { font-size: 0.67rem; font-weight: 700; padding: 2px 7px; border-radius: 4px; letter-spacing: 0.3px; }
+.badge-GET { background: #d4edda; color: #155724; }
+.badge-POST { background: #fff3cd; color: #856404; }
+.badge-PUT { background: #cce5ff; color: #004085; }
+.badge-DELETE { background: #f8d7da; color: #721c24; }
+.badge-PATCH { background: #e2d9f3; color: #4a0080; }
+.status-badge { font-size: 0.7rem; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
+.status-2 { background: #d4edda; color: #155724; }
+.status-3 { background: #fff3cd; color: #856404; }
+.status-4 { background: #f8d7da; color: #721c24; }
+.status-5 { background: #e8d5f5; color: #4a0080; }
+.path-cell { font-family: monospace; font-size: 0.74rem; color: var(--navy); }
+.dur-fast { color: #27ae60; font-weight: 600; }
+.dur-medium { color: #e67e22; font-weight: 600; }
+.dur-slow { color: #e74c3c; font-weight: 600; }
+
+/* ── Empty state ──────────────────────────────────────── */
+.empty-state { text-align: center; padding: 52px 20px; color: #aaa; }
+.empty-state i { font-size: 2.8rem; display: block; margin-bottom: 10px; color: #ccc; }
+
+/* ── Projects/clients master-list manager (projects.html) — Add/Edit are
+ * modals (ClientModal/ProjectModal); this page is just the toolbar + the
+ * grouped, collapsible client-card list below. ── */
+.pm-toolbar { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; background: #fff; border-radius: 12px; padding: 12px 16px; box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06); margin-bottom: 10px; }
+.pm-toolbar .pm-input-icon { flex: 1 1 260px; min-width: 200px; }
+.pm-search-count { font-size: 0.78rem; color: #8a94a6; white-space: nowrap; }
+.pm-toolbar-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-left: auto; }
+
+.pm-input-icon { position: relative; }
+/* Direct-child combinator — scopes this to the leading search/folder icon only,
+   so it doesn't also hijack the icon nested inside .pm-clear-btn below. */
+.pm-input-icon > i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #9aa4b5; font-size: 0.85rem; pointer-events: none; }
+.pm-input-icon input.form-control { padding-left: 34px; }
+.pm-input-icon.pm-clearable input.form-control { padding-right: 30px; }
+.pm-clear-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #9aa4b5;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+.pm-clear-btn:hover { color: #e74c3c; background: #f1f3f7; }
+
+/* Quiet circular icon buttons — used for every rename/delete action on this
+ * page instead of bordered buttons, so a card full of projects doesn't turn
+ * into a wall of boxes; the color only shows up on hover/focus. */
+.pm-icon-btn { width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; display: inline-flex; align-items: center; justify-content: center; color: #9aa4b5; font-size: 0.8rem; cursor: pointer; flex-shrink: 0; transition: background 0.12s, color 0.12s; }
+.pm-icon-btn:hover, .pm-icon-btn:focus-visible { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+.pm-icon-btn-danger:hover, .pm-icon-btn-danger:focus-visible { background: rgba(231, 76, 60, 0.1); color: #e74c3c; }
+
+/* Client cards: each client is its own collapsible panel with a header
+ * (rename/delete the client) over its projects — the one-client-to-many-
+ * projects relationship, made visible instead of two flat lists. */
+.pm-client-list { display: flex; flex-direction: column; gap: 12px; }
+.pm-client-card { background: #fff; border-radius: 12px; box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06); overflow: hidden; }
+.pm-client-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; background: #f5f7ff; border-bottom: 1px solid #eef1fa; flex-wrap: wrap; cursor: pointer; user-select: none; }
+.pm-client-head:hover { background: #eef2ff; }
+.pm-client-head-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 180px; }
+.pm-client-chevron { color: #9aa4b5; font-size: 0.8rem; flex-shrink: 0; transition: transform 0.15s ease; }
+.pm-client-chevron.collapsed { transform: rotate(-90deg); }
+.pm-client-icon { width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(22, 33, 62, 0.08); color: var(--navy); font-size: 0.95rem; }
+.pm-client-icon-muted { background: #f0f0f0; color: #9aa4b5; }
+.pm-client-name { font-weight: 700; color: var(--navy); font-size: 0.92rem; display: flex; align-items: center; gap: 8px; }
+.pm-client-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+.pm-client-body { background: #fff; padding: 14px 16px; }
+
+.pm-project-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.pm-project-chip { display: inline-flex; align-items: center; gap: 8px; background: #f8faff; border: 1px solid #eef1fa; border-radius: 20px; padding: 5px 6px 5px 14px; font-size: 0.84rem; font-weight: 600; color: var(--navy); transition: background 0.12s, border-color 0.12s; }
+.pm-project-chip:hover { background: #eef2ff; border-color: #dbe4ff; }
+.pm-project-chip i.bi-folder-fill { color: #9aa4b5; font-size: 0.8rem; }
+.pm-project-chip-actions { display: flex; gap: 2px; }
+
+.pm-add-project-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; border: 1px dashed #cdd6ea; border-radius: 20px; background: transparent; color: #6b7690; font-size: 0.8rem; font-weight: 600; padding: 6px 14px; cursor: pointer; transition: background 0.12s, color 0.12s, border-color 0.12s; }
+.pm-add-project-link:hover { background: #f5f7ff; color: #2563eb; border-color: #b7c6ff; }
+
+.pm-empty-projects { padding: 6px 2px 4px; text-align: left; color: #aaa; font-size: 0.82rem; }
+.pm-empty-projects i { margin-right: 6px; color: #ccc; }
+
+/* ── Toasts (add/edit/delete feedback, replaces alert()) ─ */
+.toast-stack {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(380px, calc(100vw - 40px));
+}
+.toast-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+  border-left: 4px solid #888;
+  animation: toast-in 0.2s ease;
+}
+.toast-item.toast-success { border-left-color: #198754; }
+.toast-item.toast-error { border-left-color: #dc3545; }
+.toast-item.toast-info { border-left-color: #2563eb; }
+.toast-icon { font-size: 1.05rem; margin-top: 1px; flex-shrink: 0; }
+.toast-success .toast-icon { color: #198754; }
+.toast-error .toast-icon { color: #dc3545; }
+.toast-info .toast-icon { color: #2563eb; }
+.toast-msg { flex: 1; font-size: 0.85rem; color: #1a1a2e; line-height: 1.4; word-break: break-word; }
+.toast-close { border: none; background: transparent; color: #b0b6c0; font-size: 0.7rem; padding: 2px; margin-top: 1px; cursor: pointer; flex-shrink: 0; }
+.toast-close:hover { color: #333; }
+@keyframes toast-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ── Settings page — selected-user chips (Invoice Released editors) ── */
+.settings-user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--navy);
+  color: #fff;
+  border-radius: 20px;
+  padding: 6px 6px 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.settings-user-chip-role { color: rgba(255, 255, 255, 0.65); font-weight: 400; }
+.settings-chip-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+.settings-chip-remove:hover { background: rgba(255, 255, 255, 0.32); }
+
+/* ── Password gate ("locked feature") pattern ────────── */
+.gate-wrap { display: flex; align-items: center; justify-content: center; min-height: 60vh; }
+.gate-card { background: #fff; border-radius: 14px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1); padding: 32px 36px; max-width: 380px; width: 100%; text-align: center; }
+.gate-icon { width: 52px; height: 52px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 10px; color: #fff; font-size: 1.4rem; }
+.gate-icon-navy { background: linear-gradient(135deg, #16213e, #1a2d5a); }
+.gate-icon-deepblue { background: linear-gradient(135deg, #0f3460, #16213e); }
+
+/* ── Editing log project+client selector ─────────────── */
+.selector-card { background: #fff; border-radius: 12px; padding: 16px 20px; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07); margin-bottom: 14px; }
+.selector-current { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 9px 16px; background: #1a237e; border-radius: 9px; color: #fff; font-size: 0.82rem; flex-wrap: wrap; }
+.sel-cnt { background: rgba(255, 255, 255, 0.18); border-radius: 5px; padding: 1px 9px; font-size: 0.72rem; margin-left: 2px; }
+
+/* ── Pagination pills (index/management/drilldowns) ──── */
+.pg-btn { border: 1px solid #dee2e6; background: #fff; color: #0f3d2e; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; cursor: pointer; transition: all 0.12s; }
+.pg-btn:hover { background: #0f3d2e; color: #fff; }
+.pg-btn.active { background: #0f3d2e; color: #fff; font-weight: 700; border-color: #0f3d2e; }
+
+/* ── Project Lifecycle timeline + detail panels (project drilldown page) ──── */
+.lifecycle-card { padding-top: 1.25rem; transition: box-shadow 0.2s ease, transform 0.2s ease; }
+.lifecycle-card:hover { box-shadow: 0 10px 28px rgba(22, 33, 62, 0.13); transform: translateY(-2px); }
+.lifecycle-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 2rem; }
+.lifecycle-title { font-size: 1.05rem; font-weight: 700; color: #1a1a2e; }
+.lifecycle-subtitle { font-size: 0.78rem; color: #8a94a6; margin-top: 2px; }
+.lifecycle-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.lifecycle-track { position: relative; min-height: 132px; margin: 0 0 1.25rem; }
+/* left/width come from inline styles (SubmissionOverview.js) so the line only
+ * spans between the first and last stage circles — no bare stub hanging off
+ * before Project Received or after Completed. */
+.lifecycle-track-line, .lifecycle-track-fill { position: absolute; top: 20px; height: 4px; border-radius: 2px; }
+.lifecycle-track-line { background: #e3e6ee; }
+.lifecycle-track-fill { background: linear-gradient(90deg, #1a7a44, #2563eb); transition: width 0.3s ease; }
+
+.lifecycle-gap-pill {
+  position: absolute;
+  top: -10px;
+  transform: translateX(-50%);
+  background: #fff;
+  border: 1px solid #dee2e6;
+  color: #8a94a6;
+  font-size: 0.64rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.lifecycle-step {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 160px;
+}
+.lifecycle-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  background: #e3e6ee;
+  color: #8a94a6;
+  border: 3px solid #f4f6fb;
+  z-index: 1;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.lifecycle-step-done .lifecycle-circle { background: #1a7a44; color: #fff; }
+.lifecycle-step-current .lifecycle-circle { background: #2563eb; color: #fff; width: 44px; height: 44px; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18); }
+.lifecycle-step-pending .lifecycle-circle { background: #fff; color: #b0b6c0; border-color: #e3e6ee; }
+
+.lifecycle-step-label { font-size: 0.8rem; font-weight: 700; color: #1a1a2e; line-height: 1.25; margin-bottom: 6px; }
+.lifecycle-step-current .lifecycle-step-label { color: #2563eb; }
+.lifecycle-step-pending .lifecycle-step-label { color: #8a94a6; }
+
+/* One dot per distinct submission date along a segment (see SubmissionOverview.js
+ * clusterByDate/dotPositions) — sits right on the track line, between the two
+ * stage circles whose type-group it belongs to. */
+.lifecycle-type-dot {
+  position: absolute;
+  top: 20px;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  line-height: 0;
+  appearance: none;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #7c3aed;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.lifecycle-type-dot:hover,
+.lifecycle-type-dot:focus-visible {
+  transform: translate(-50%, -50%) scale(1.35);
+  box-shadow: 0 0 0 5px rgba(124, 58, 237, 0.18);
+}
+.lifecycle-dot-count {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  background: #7c3aed;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 999px;
+  min-width: 15px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  border: 2px solid #fff;
+}
+
+/* One submission's details inside the dot-click popup (SubmissionOverview.js) —
+ * multiple same-day submissions stack here, separated by a divider. */
+.dot-popup-record-sep { margin-top: 0.85rem; padding-top: 0.85rem; border-top: 1px solid #eee; }
+.dot-popup-title { font-weight: 700; margin-bottom: 0.6rem; }
+.dot-popup-type {
+  display: inline-block;
+  background: #f1f3f7;
+  color: #4b5563;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.dot-popup-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 0.6rem; }
+
+.lifecycle-badge-active { background: #dbeafe; color: #1e40af; }
+.lifecycle-badge-done { background: green; color: #065f46; }
+.lifecycle-badge-pending { background: #f1f3f7; color: #8a94a6; }
+
+.lifecycle-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 0.85rem; border-top: 1px solid #eee; font-size: 0.82rem; color: #555; }
+.lifecycle-pct { font-weight: 800; font-size: 0.95rem; }
+.lifecycle-pct-zero { color: #dc3545; }
+.lifecycle-pct-mid { color: #e67e22; }
+.lifecycle-pct-done { color: #198754; }
+
+.detail-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; align-items: start; margin-bottom: 1rem; }
+.detail-main, .detail-side { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+@media (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } }
+
+.co-rfi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+@media (max-width: 1200px) { .co-rfi-row { grid-template-columns: 1fr; } }
+
+.detail-panel {
+  border: 1px solid #dddddd;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.detail-panel:hover { box-shadow: 0 10px 28px rgba(22, 33, 62, 0.13); transform: translateY(-2px); }
+
+/* Panel header: icon + title(+count)/subtitle on the left, action buttons on
+ * the right — every section uses PanelHeader (SubmissionOverview.js) so this
+ * always renders the same shape, only the color varies per section. Its own
+ * top corners match .detail-panel's radius so the header still looks
+ * seamless on cards like .settings-permission-card that turn off the
+ * parent's overflow:hidden (needed elsewhere to keep this header's
+ * background from squaring off, but it also clips anything meant to pop
+ * outside the card — e.g. a SearchableDropdown's results list). */
+.detail-panel-header { padding: 12px 16px; border-radius: 12px 12px 0 0; }
+.dp-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.dp-header-left { display: flex; align-items: center; gap: 10px; }
+.dp-header-title { font-weight: 700; font-size: 0.88rem; color: #16213e; display: flex; align-items: center; }
+.dp-header-subtitle { font-size: 0.72rem; color: #8a94a6; margin-top: 1px; }
+.dp-header-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.dp-count-badge { background: rgba(22, 33, 62, 0.08); color: #16213e; font-size: 0.7rem; font-weight: 700; padding: 1px 8px; border-radius: 10px; margin-left: 6px; }
+
+.dp-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+/* Each section gets its own hue for both the icon and the header tint below,
+ * so panels are distinguishable at a glance without reading the title. */
+.dp-icon-indigo { background: #e0e7ff; color: #4338ca; }
+.dp-icon-blue { background: #dbeafe; color: #1d4ed8; }
+.dp-icon-amber { background: #fef3c7; color: #b45309; }
+.dp-icon-green { background: #d1fae5; color: #059669; }
+.dp-icon-navy { background: #dbe4ff; color: #1e3a8a; }
+.dp-icon-purple { background: #ede9fe; color: #6d28d9; }
+.dp-icon-teal { background: #ccfbf1; color: #0f766e; }
+.dp-icon-rose { background: #fee2e2; color: #b91c1c; }
+
+.dp-header-indigo { background: #eef1ff; }
+.dp-header-blue { background: #eff6ff; }
+.dp-header-amber { background: #fffbeb; }
+.dp-header-green { background: #ecfdf5; }
+.dp-header-navy { background: #eef2ff; }
+.dp-header-purple { background: #f5f3ff; }
+.dp-header-teal { background: #f0fdfa; }
+.dp-header-rose { background: #fef2f2; }
+
+.detail-panel-body { padding: 14px 16px; }
+
+.dp-fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; }
+.dp-field-label { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #8a94a6; margin-bottom: 2px; }
+.dp-field-value { font-size: 0.9rem; font-weight: 600; color: #1a1a2e; }
+.dp-note { font-size: 0.82rem; color: #666; font-style: italic; margin-top: 12px; }
+
+/* Extra highlighted line in a confirm modal (SubmissionOverview.js
+ * requestConfirm's `warning` param) — e.g. flagging submissions that
+ * aren't completed yet, without blocking a manual signoff action. */
+.confirm-warning {
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  margin-top: 10px;
+}
+.dp-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.dp-tags .badge { font-weight: 600; text-transform: capitalize; }
+
+.team-member-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  margin: 0 -6px;
+  border-radius: 8px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.15s ease;
+}
+.team-member-row:last-child { border-bottom: none; }
+.team-member-row:hover { background: #f5f8ff; }
+.avatar-circle { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.78rem; flex-shrink: 0; }
+.team-member-name { font-weight: 600; font-size: 0.85rem; color: #1a1a2e; }
+.team-member-role { font-size: 0.72rem; color: #8a94a6; }
+
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 6px;
+  margin: 0 -6px;
+  border-radius: 8px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.15s ease;
+}
+.activity-item:last-child { border-bottom: none; }
+.activity-item:hover { background: #f5f8ff; }
+.activity-dot { width: 8px; height: 8px; border-radius: 50%; background: #2563eb; margin-top: 5px; flex-shrink: 0; }
+.activity-title { font-weight: 600; font-size: 0.82rem; color: #1a1a2e; }
+.activity-meta { font-size: 0.72rem; color: #8a94a6; }
+
+/* ── Create Change Order modal (plain white header, not the navy Modal bar) ── */
+.co-modal-header { display: flex; align-items: flex-start; gap: 12px; padding: 1.1rem 1.25rem; border-bottom: 1px solid #eee; }
+.co-modal-header-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #d1fae5;
+  color: #059669;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.co-modal-title { font-weight: 700; font-size: 1rem; color: #1a1a2e; }
+.co-modal-subtitle { font-size: 0.78rem; color: #8a94a6; margin-top: 2px; }
+.co-modal-close { margin-left: auto; border: none; background: transparent; color: #b0b6c0; font-size: 1rem; padding: 4px; cursor: pointer; }
+.co-modal-close:hover { color: #333; }
+
+/* ── Change Order cards (submission detail page) ─────── */
+.co-list { display: flex; flex-direction: column; gap: 12px; }
+.co-card {
+  position: relative;
+  background: #fff;
+  border: 1px solid #eef0f5;
+  border-left: 4px solid #6366f1;
+  border-radius: 10px;
+  padding: 14px 16px;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.co-card:hover { box-shadow: 0 6px 18px rgba(99, 102, 241, 0.12); border-color: #c7d2fe; transform: translateY(-2px); }
+
+/* Simple one-line-per-submission list (Submission Details panel,
+ * SubmissionOverview.js) — an info button opens the full detail popup
+ * instead of the whole row being a click target. */
+.submission-row-list { display: flex; flex-direction: column; }
+.submission-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 4px;
+  border-bottom: 1px solid #f0f1f5;
+  flex-wrap: wrap;
+}
+.submission-row:last-child { border-bottom: none; }
+.submission-row:hover { background: #f8f9fc; }
+.submission-row-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.submission-row-type {
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.submission-row-name { font-weight: 600; font-size: 0.85rem; color: #1a1a2e; }
+.submission-row-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.submission-row-date { font-size: 0.75rem; color: #8a94a6; white-space: nowrap; }
+.submission-row-pct {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #2563eb;
+  background: #eff6ff;
+  padding: 2px 9px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.co-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.co-card-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.co-number-pill { background: #d1fae5; color: #065f46; font-size: 0.72rem; font-weight: 700; padding: 2px 10px; border-radius: 6px; font-family: monospace; }
+.co-change-type { font-weight: 700; font-size: 0.92rem; color: #1a1a2e; }
+.co-card-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.co-status-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; padding: 3px 10px; border-radius: 20px; }
+.co-status-pending { background: #ede9fe; color: #6d28d9; }
+.co-status-approved { background: #d1fae5; color: #065f46; }
+.co-status-rejected { background: #fdeaea; color: #c0392b; }
+
+.co-notes { font-size: 0.82rem; color: #666; margin: 10px 0; }
+
+.co-chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.co-chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #dbeafe; background: #f5f9ff; color: #2563eb; font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+.co-chip-label { color: #7a8ba6; font-weight: 700; text-transform: uppercase; font-size: 0.6rem; }
+.co-chip-muted { border-color: #e3e6ee; background: #f7f8fa; color: #8a94a6; }
+
+.co-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid #f4f6fb; }
+.co-created-by { display: flex; align-items: center; gap: 5px; font-size: 0.78rem; color: #8a94a6; }
+.co-approval-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.co-approval-label, .co-billed-label { font-size: 0.78rem; color: #8a94a6; font-weight: 600; }
+.co-billed-status-text { font-size: 0.78rem; color: #8a94a6; }
+.co-approve-btn, .co-reject-btn {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.co-approve-btn { background: #d1fae5; color: #065f46; }
+.co-approve-btn:hover { background: #bbf7d0; }
+.co-reject-btn { background: #fdeaea; color: #c0392b; }
+.co-reject-btn:hover { background: #fbdada; }
+
+/* ── RFI/Clarification (shares .co-card/.co-modal/.co-chip-row etc. — its
+   own bits are the icon color, type pill, status colors, filter bar, and
+   CTA button) ── */
+.co-modal-header-icon-amber { background: #fef3c7; color: #b45309; }
+.co-modal-header-icon-blue { background: #dbeafe; color: #1d4ed8; }
+.co-optional-label { font-weight: 400; color: #8a94a6; text-transform: none; letter-spacing: 0; }
+
+.rfi-type-pill { background: #fff7ed; color: #b45309; border: 1px solid #fed7aa; font-size: 0.72rem; font-weight: 700; padding: 1px 9px; border-radius: 6px; }
+.rfi-status-pending { background: #eef0f5; color: #64748b; }
+.rfi-status-overdue { background: #fdeaea; color: #c0392b; }
+.rfi-status-returned { background: #d1fae5; color: #065f46; }
+
+.co-chip-amber { border-color: #fed7aa; background: #fff7ed; color: #b45309; }
+.co-chip-green { border-color: #bbf7d0; background: #f0fdf4; color: #15803d; }
+
+.rfi-filter-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 16px; background: #f4f6fb; border-bottom: 1px solid #eef0f5; }
+.rfi-filter-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #8a94a6; margin-right: 2px; }
+.rfi-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #dee2e6;
+  background: #fff;
+  color: #555;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.rfi-filter-pill:hover { border-color: #4da6ff; background: #eaf2ff; }
+.rfi-filter-pill.active { background: #4f6ef7; border-color: #4f6ef7; color: #fff; }
+
+.btn-rfi-orange {
+  background: #ea7c17;
+  border: 1px solid #ea7c17;
+  color: #fff;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 0.375rem 1rem;
+  transition: background 0.15s ease;
+}
+.btn-rfi-orange:hover:not(:disabled) { background: #d16d0f; border-color: #d16d0f; color: #fff; }
+.btn-rfi-orange:disabled { opacity: 0.65; }
+
+/* ── Settings page — 2-up permission cards ───────────── */
+.settings-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; align-items: stretch; }
+.settings-grid-full { grid-column: 1 / -1; }
+@media (max-width: 900px) { .settings-grid { grid-template-columns: 1fr; } }
+/* Overrides .detail-panel's overflow:hidden — otherwise the "Add a user"
+ * SearchableDropdown's results list gets clipped at the card's bottom edge
+ * instead of floating over whatever's below it (its header keeps its own
+ * rounded top corners regardless — see .detail-panel-header above). */
+.settings-permission-card { display: flex; flex-direction: column; overflow: visible; }
+/* .detail-panel:hover's `transform` creates a new stacking context the
+ * instant the mouse enters — which can suddenly paint this card *above* an
+ * open dropdown floating over it from the card before it (a transformed
+ * element's z-index is compared at its own parent's stacking level, not
+ * against the dropdown's z-index inside a sibling subtree), flipping which
+ * element is under the cursor and back again in a blinking loop. These
+ * cards are static forms, not clickable summaries, so the hover "lift"
+ * buys nothing — turn it off rather than fight the stacking edge case. */
+.settings-permission-card:hover { transform: none; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07); }
