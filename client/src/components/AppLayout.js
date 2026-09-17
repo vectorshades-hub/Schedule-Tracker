@@ -124,6 +124,9 @@ export default function AppLayout({ children, allow }) {
           {(["admin", "management"].includes(role) || user.can_edit_invoice_released) && (
             <a href="/management-dashboard"><i className="bi bi-graph-up-arrow" /> Management Dashboard</a>
           )}
+          {["admin", "finance"].includes(role) && (
+            <a href="/finance-dashboard"><i className="bi bi-cash-coin" /> Finance Dashboard</a>
+          )}
           {role === "admin" && <a href="/request-log"><i className="bi bi-hdd-network-fill" /> Request Log</a>}
 
           <div className="ms-auto d-flex align-items-center gap-3">

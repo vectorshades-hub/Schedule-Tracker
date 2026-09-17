@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: {
     type: String,
-    enum: ["admin", "management", "team_lead", "qaqc", "user"],
+    enum: ["admin", "management", "finance", "team_lead", "qaqc", "user"],
     default: "team_lead",
   },
   allowedTeams: { type: [String], default: [] }, // management only

@@ -21,3 +21,15 @@ export function useSetInvoiceReleased() {
     },
   });
 }
+
+export function useReleaseToFinance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, released = true }) => api.post(`/change-orders/${id}/release-to-finance`, { released }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["management-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["finance-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["change-orders"] });
+    },
+  });
+}

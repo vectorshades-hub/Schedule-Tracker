@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import SearchableDropdown from "./SearchableDropdown";
 
 const CHANGE_TYPES = ["Revision", "Re-approval", "Scope Addition", "Scope Reduction", "Design Change", "Material Substitution", "Timeline Extension", "Budget Adjustment", "Client Request", "RFI Response", "Drawing Update", "Specification Change", "Site Condition"];
+const CURRENCIES = ["USD", "EUR", "GBP", "INR", "CAD", "AUD"];
 
 function todayISO() {
   const d = new Date();
@@ -10,7 +11,7 @@ function todayISO() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-const EMPTY_FORM = { co_number: "", team: "", date: todayISO(), change_type: "", notes: "", hours: "", approval: "Pending", billed: false };
+const EMPTY_FORM = { co_number: "", team: "", date: todayISO(), change_type: "", notes: "", hours: "", approval: "Pending", billed: false, currency: "USD", amount: "" };
 
 /** Matches the reference design: a plain white card (not the app's usual
  * navy-header Modal) with an icon+title+subtitle header. Self-contained
@@ -36,6 +37,8 @@ export default function CreateChangeOrderModal({ open, onClose, onSubmit, submit
             hours: initial.hours || initial.hours === 0 ? String(initial.hours) : "",
             approval: initial.approval || "Pending",
             billed: !!initial.billed,
+            currency: initial.currency || "USD",
+            amount: initial.amount || initial.amount === 0 ? String(initial.amount) : "",
           }
         : { ...EMPTY_FORM, team: defaultTeam }
     );
@@ -58,7 +61,7 @@ export default function CreateChangeOrderModal({ open, onClose, onSubmit, submit
           <div>
             <div className="co-modal-title">{isEdit ? "Edit Change Order" : "Create Change Order"}</div>
             <div className="co-modal-subtitle">
-              {isEdit ? `Update CO #${initial.co_number}` : "Add a new CO to this project"}
+              {isEdit ? `Update CO${initial.co_number}` : "Add a new CO to this project"}
             </div>
           </div>
           <button type="button" className="co-modal-close" onClick={onClose} aria-label="Close">
@@ -136,6 +139,37 @@ export default function CreateChangeOrderModal({ open, onClose, onSubmit, submit
                   placeholder="0.0"
                   value={form.hours}
                   onChange={(e) => setForm((f) => ({ ...f, hours: e.target.value }))}
+                />
+              </div>
+              <div className="col-4">
+                <label className="form-label small fw-bold">Currency</label>
+                <select
+                  className="form-select"
+                  value={form.currency}
+                  onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
+                >
+                  {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="col-4">
+                <label className="form-label small fw-bold">Amount (per hour)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="form-control"
+                  placeholder="0.00"
+                  value={form.amount}
+                  onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                />
+              </div>
+              <div className="col-4">
+                <label className="form-label small fw-bold d-block">Total</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  disabled
+                  value={`${form.currency} ${((Number(form.hours) || 0) * (Number(form.amount) || 0)).toFixed(2)}`}
                 />
               </div>
               <div className="col-4">

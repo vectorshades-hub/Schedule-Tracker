@@ -42,6 +42,23 @@ const changeOrderSchema = new mongoose.Schema({
   invoiceReleasedReason: { type: String, default: "" },
   invoiceReleasedBy: { type: String, default: "" },
   invoiceReleasedAt: { type: Date, default: null },
+  // Currency/Amount/Total — Amount is a rate, Total is always server-computed
+  // as hours * amount (see routes/changeOrders.js) rather than typed in
+  // directly, so it can never drift out of sync with Hours/Amount edits.
+  currency: { type: String, default: "USD" },
+  amount: { type: Number, default: 0 },
+  total: { type: Number, default: 0 },
+  // Separate from the Invoice Released workflow above — Release to Finance
+  // hands a CO off to the finance role's own dashboard (routes/financeDashboard.js),
+  // which then acknowledges it. Gated by requireRole("admin","management") /
+  // requireRole("admin","finance") in routes/changeOrders.js, not a Settings
+  // permission list, since it's a plain role split rather than a per-user grant.
+  releasedToFinance: { type: Boolean, default: false },
+  releasedToFinanceBy: { type: String, default: "" },
+  releasedToFinanceAt: { type: Date, default: null },
+  financeAcknowledged: { type: Boolean, default: false },
+  financeAcknowledgedBy: { type: String, default: "" },
+  financeAcknowledgedAt: { type: Date, default: null },
 });
 
 module.exports = mongoose.model("ChangeOrder", changeOrderSchema);

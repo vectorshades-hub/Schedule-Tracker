@@ -17,6 +17,8 @@ out/
 !**/uploads/hold_images/.gitkeep
 **/uploads/onhold_attachments/*
 !**/uploads/onhold_attachments/.gitkeep
+**/uploads/project_images/*
+!**/uploads/project_images/.gitkeep
 **/uploads/backups/*
 !**/uploads/backups/.gitkeep
 

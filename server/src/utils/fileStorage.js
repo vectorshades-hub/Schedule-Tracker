@@ -10,8 +10,10 @@ const env = require("../config/env");
 // 404/ENOENT when a different route later looked for them under the other.
 const HOLD_IMAGES_DIR = path.join(env.uploadDir, "hold_images");
 const LEGACY_ONHOLD_DIR = path.join(env.uploadDir, "onhold_attachments");
+const PROJECT_IMAGES_DIR = path.join(env.uploadDir, "project_images");
 
 fs.mkdirSync(HOLD_IMAGES_DIR, { recursive: true });
+fs.mkdirSync(PROJECT_IMAGES_DIR, { recursive: true });
 fs.mkdirSync(env.backupDir, { recursive: true });
 
 // One-time migration: fold any files left over in the old onhold_attachments
@@ -75,10 +77,31 @@ function deleteHoldImage(filename) {
   }
 }
 
+function resolveProjectImagePath(filename) {
+  if (!filename) return null;
+  const safe = sanitizeFilename(filename);
+  const p = path.join(PROJECT_IMAGES_DIR, safe);
+  return fs.existsSync(p) ? p : null;
+}
+
+/** Deletes a project image by filename, if it exists. Safe to call with an empty/unknown filename. */
+function deleteProjectImage(filename) {
+  const resolved = resolveProjectImagePath(filename);
+  if (!resolved) return;
+  try {
+    fs.unlinkSync(resolved);
+  } catch (e) {
+    console.error("[fileStorage] failed deleting", resolved, e.message);
+  }
+}
+
 module.exports = {
   HOLD_IMAGES_DIR,
+  PROJECT_IMAGES_DIR,
   sanitizeFilename,
   saveUploadedFile,
   resolveHoldImagePath,
   deleteHoldImage,
+  resolveProjectImagePath,
+  deleteProjectImage,
 };

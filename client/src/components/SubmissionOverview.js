@@ -1,7 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "../lib/ToastContext";
-import { ApiError } from "../lib/api";
+import { api, ApiError, API_URL } from "../lib/api";
 import { useDashboardConfig } from "../hooks/useRecords";
 import {
   useChangeOrders,
@@ -30,6 +30,7 @@ import CreateChangeOrderModal from "./CreateChangeOrderModal";
 import ChangeOrderCard from "./ChangeOrderCard";
 import CreateRfiModal from "./CreateRfiModal";
 import RfiCard from "./RfiCard";
+import ImageLightboxModal from "./ImageLightboxModal";
 
 /** A color-coded icon + title(+count)/subtitle + optional action buttons —
  * every panel below uses this so each section reads as its own distinct
@@ -53,6 +54,119 @@ function PanelHeader({ icon, color, title, subtitle, count, actions }) {
         {actions && <div className="dp-header-actions">{actions}</div>}
       </div>
     </div>
+  );
+}
+
+/**
+ * The project's cover image — drag/drop, paste, or click to upload (canEdit
+ * only), and click the thumbnail to open it full-size in ImageLightboxModal.
+ * Uploads go straight to the server (POST /api/projects/:name/image) rather
+ * than staging like the record-level hold attachment does, since there's no
+ * surrounding form submit to piggyback on here.
+ */
+function ProjectImagePanel({ projectName, imageFilename, canEdit, onChanged }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const inputId = "project-image-input";
+
+  useEffect(() => {
+    if (!canEdit) return;
+    function onPaste(e) {
+      const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
+      if (item) handleFile(item.getAsFile());
+    }
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEdit, projectName]);
+
+  async function handleFile(file) {
+    if (!file || !projectName || busy) return;
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      await api.post(`/projects/${encodeURIComponent(projectName)}/image`, fd);
+      toast.success("Project image updated.");
+      onChanged?.();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Failed to upload image.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRemove(e) {
+    e.stopPropagation();
+    if (!projectName || busy) return;
+    setBusy(true);
+    try {
+      await api.post(`/projects/${encodeURIComponent(projectName)}/image/delete`, {});
+      toast.success("Project image removed.");
+      onChanged?.();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Failed to remove image.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const imageUrl = imageFilename ? `${API_URL}/projects/image/${imageFilename}` : "";
+
+  return (
+    <>
+      <div className="detail-panel">
+        <PanelHeader icon="bi-image-fill" color="rose" title="Project Image" subtitle="Cover photo or reference image for this project" />
+        <div className="detail-panel-body">
+          {imageUrl ? (
+            <div className="project-image-preview" onClick={() => setLightboxOpen(true)} title="Click to view full size">
+              <img src={imageUrl} alt="Project" />
+              {canEdit && (
+                <div className="project-image-actions">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary"
+                    disabled={busy}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      document.getElementById(inputId)?.click();
+                    }}
+                  >
+                    <i className="bi bi-arrow-repeat" /> Replace
+                  </button>
+                  <button type="button" className="btn btn-sm btn-outline-danger" disabled={busy} onClick={handleRemove}>
+                    <i className="bi bi-trash" /> Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : canEdit ? (
+            <div
+              className="project-image-dropzone"
+              onClick={() => document.getElementById(inputId)?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                handleFile(e.dataTransfer.files?.[0]);
+              }}
+            >
+              <i className="bi bi-cloud-arrow-up fs-2" />
+              <div>{busy ? "Uploading…" : "Drag & drop, paste (Ctrl+V), or click to choose an image"}</div>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <i className="bi bi-image" />
+              <div>No project image yet</div>
+            </div>
+          )}
+          {canEdit && (
+            <input id={inputId} type="file" accept="image/*" hidden onChange={(e) => handleFile(e.target.files?.[0])} />
+          )}
+        </div>
+      </div>
+      <ImageLightboxModal open={lightboxOpen} onClose={() => setLightboxOpen(false)} src={imageUrl} title={projectName} />
+    </>
   );
 }
 
@@ -84,6 +198,8 @@ export default function SubmissionOverview({
   fabCompleted = false,
   fabCompletedAt = "",
   onMarkFabCompleted,
+  projectImageFilename = "",
+  onProjectImageChanged,
   onEditRecord,
   onDeleteRecord,
 }) {
@@ -170,6 +286,8 @@ export default function SubmissionOverview({
       hours: form.hours,
       approval: form.approval,
       billed: form.billed,
+      currency: form.currency,
+      amount: form.amount,
     };
     try {
       const res = editingCO
@@ -815,6 +933,13 @@ export default function SubmissionOverview({
         </div>
 
         <div className="detail-side">
+          <ProjectImagePanel
+            projectName={projectName}
+            imageFilename={projectImageFilename}
+            canEdit={canEdit}
+            onChanged={onProjectImageChanged}
+          />
+
           <div className="detail-panel">
             <PanelHeader
               icon="bi-info-circle-fill"

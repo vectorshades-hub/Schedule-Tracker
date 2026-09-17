@@ -9,8 +9,8 @@ const upload = require("../middleware/upload");
 
 const router = createSafeRouter();
 
-const VALID_ROLES = ["admin", "team_lead", "management", "qaqc", "user"];
-const ROLE_ORDER = { admin: 0, management: 1, team_lead: 2, qaqc: 3, user: 4 };
+const VALID_ROLES = ["admin", "team_lead", "management", "finance", "qaqc", "user"];
+const ROLE_ORDER = { admin: 0, management: 1, finance: 2, team_lead: 3, qaqc: 4, user: 5 };
 
 function toClient(u) {
   return {

@@ -8,6 +8,7 @@ import HoldViewModal from "./HoldViewModal";
 import HoldAttachmentModal from "./HoldAttachmentModal";
 import RecordInfoModal from "./RecordInfoModal";
 import SubmissionOverview from "./SubmissionOverview";
+import ProjectHeroExtras from "./ProjectHeroExtras";
 import PageHero from "./PageHero";
 import StatPill from "./StatPill";
 import PercentageCell from "./PercentageCell";
@@ -15,6 +16,7 @@ import SearchableDropdown from "./SearchableDropdown";
 import SwitchToggle from "./SwitchToggle";
 import Modal from "./Modal";
 import { useDeleteRecord, useToggleField, useQaqcToggle, useUpdateRecord, useDashboardConfig } from "../hooks/useRecords";
+import { useChangeOrders } from "../hooks/useChangeOrders";
 import { useToast } from "../lib/ToastContext";
 
 const SUBMISSION_TYPES = ["OFA", "FAB", "REAPPROVAL", "REVISION", "FOR REVIEW", "FIELD USE"];
@@ -51,6 +53,13 @@ export default function SubmissionsDrilldown({ by, name }) {
     queryFn: () => api.get(`/projects/${encodeURIComponent(name)}`),
     enabled: by === "project" && !!name,
   });
+
+  // Shares its cache with SubmissionOverview's own useChangeOrders(projectName)
+  // call below (same query key) — the ProjectHeroExtras summary (Quoted
+  // Hours + CO earnings by finance-acknowledgement) only needs the list, not
+  // its own fetch.
+  const { data: coData } = useChangeOrders(by === "project" ? name : undefined);
+  const heroChangeOrders = coData?.change_orders || [];
 
   async function handleMarkProjectCompleted() {
     try {
@@ -235,6 +244,17 @@ export default function SubmissionsDrilldown({ by, name }) {
         icon={by === "project" ? "bi-folder-fill" : "bi-building"}
         title={`${by === "project" ? "Project" : "Client"}: ${name}`}
         meta={`${stats.total} submissions`}
+        right={
+          by === "project" && (
+            <ProjectHeroExtras
+              projectName={name}
+              canEdit={canEdit}
+              quotedHours={projectData?.quoted_hours || 0}
+              onQuotedHoursChanged={refetchProject}
+              changeOrders={heroChangeOrders}
+            />
+          )
+        }
       />
 
       {by === "project" && allRecords.length > 0 && (
@@ -253,6 +273,8 @@ export default function SubmissionsDrilldown({ by, name }) {
           fabCompleted={!!projectData?.fab_completed}
           fabCompletedAt={projectData?.fab_completed_at}
           onMarkFabCompleted={handleMarkFabCompleted}
+          projectImageFilename={projectData?.image_filename || ""}
+          onProjectImageChanged={refetchProject}
           onEditRecord={openEdit}
           onDeleteRecord={setDeleteTarget}
         />

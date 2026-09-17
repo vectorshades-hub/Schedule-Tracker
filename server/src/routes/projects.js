@@ -1,9 +1,19 @@
 const express = require("express");
+const path = require("path");
 const createSafeRouter = require("../utils/safeRouter");
 const { Project, Client, Record } = require("../models");
-const { requireRole } = require("../middleware/auth");
+const { requireRole, requireAuth } = require("../middleware/auth");
+const upload = require("../middleware/upload");
 const { writeLog } = require("../services/logging");
 const statusEngine = require("../services/statusEngine");
+const { canUpdateRecords } = require("../services/settingsService");
+const {
+  PROJECT_IMAGES_DIR,
+  sanitizeFilename,
+  saveUploadedFile,
+  resolveProjectImagePath,
+  deleteProjectImage,
+} = require("../utils/fileStorage");
 const env = require("../config/env");
 
 const router = createSafeRouter();
@@ -54,6 +64,8 @@ router.get("/:name", requireRole("admin", "management", "team_lead"), async (req
       ofa_completed_at: "",
       fab_completed: false,
       fab_completed_at: "",
+      image_filename: "",
+      quoted_hours: 0,
     });
   }
   res.json({
@@ -65,7 +77,77 @@ router.get("/:name", requireRole("admin", "management", "team_lead"), async (req
     ofa_completed_at: p.ofaCompletedAt ? new Date(p.ofaCompletedAt).toISOString() : "",
     fab_completed: !!p.fabCompleted,
     fab_completed_at: p.fabCompletedAt ? new Date(p.fabCompletedAt).toISOString() : "",
+    image_filename: p.imageFilename || "",
+    quoted_hours: p.quotedHours || 0,
   });
+});
+
+/**
+ * POST /api/projects/:name/quoted-hours — sets the project's quoted hours.
+ * Gated by the same "who can update records" permission as editing records
+ * (settingsService.canUpdateRecords), not the admin/management/team_lead
+ * role check the rest of this router's mutations use — this is meant to be
+ * editable by the same people who can edit submissions/change orders.
+ */
+router.post("/:name/quoted-hours", requireAuth, async (req, res) => {
+  if (!(await canUpdateRecords(req.session.userId, req.session.role))) {
+    return res.status(403).json({ ok: false, error: "You don't have permission to update this project." });
+  }
+  const name = decodeURIComponent(req.params.name);
+  const hours = Number(req.body.quoted_hours);
+  if (!Number.isFinite(hours) || hours < 0) {
+    return res.status(400).json({ ok: false, error: "Quoted hours must be a non-negative number." });
+  }
+  await Project.updateOne({ name }, { $set: { quotedHours: hours } }, { upsert: true });
+  writeLog("PROJECT-QUOTED-HOURS", `'${name}' set to ${hours}h`, req.session.username);
+  res.json({ ok: true, quoted_hours: hours });
+});
+
+/**
+ * POST /api/projects/:name/image — multipart `image` file, upserts the
+ * project's cover image. Gated by the same "who can update records"
+ * permission as editing records (settingsService.canUpdateRecords) — the
+ * client's canEdit prop on SubmissionOverview rides the same flag.
+ */
+router.post("/:name/image", requireAuth, upload.single("image"), async (req, res) => {
+  if (!(await canUpdateRecords(req.session.userId, req.session.role))) {
+    return res.status(403).json({ ok: false, error: "You don't have permission to update this project." });
+  }
+  const name = decodeURIComponent(req.params.name);
+  if (!req.file) return res.status(400).json({ ok: false, error: "No image provided." });
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  if (!env.allowedImageExts.includes(ext)) {
+    return res.status(400).json({ ok: false, error: "Invalid image type." });
+  }
+  try {
+    const filename = saveUploadedFile(PROJECT_IMAGES_DIR, sanitizeFilename(name), req.file.originalname, req.file.buffer);
+    const prev = await Project.findOne({ name }).lean();
+    await Project.updateOne({ name }, { $set: { imageFilename: filename } }, { upsert: true });
+    if (prev?.imageFilename && prev.imageFilename !== filename) deleteProjectImage(prev.imageFilename);
+    writeLog("PROJECT-IMAGE-UPLOAD", `'${name}'`, req.session.username);
+    res.json({ ok: true, image_filename: filename });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** POST /api/projects/:name/image/delete — removes the project's cover image. */
+router.post("/:name/image/delete", requireAuth, async (req, res) => {
+  if (!(await canUpdateRecords(req.session.userId, req.session.role))) {
+    return res.status(403).json({ ok: false, error: "You don't have permission to update this project." });
+  }
+  const name = decodeURIComponent(req.params.name);
+  const prev = await Project.findOneAndUpdate({ name }, { $set: { imageFilename: "" } });
+  if (prev?.imageFilename) deleteProjectImage(prev.imageFilename);
+  writeLog("PROJECT-IMAGE-DELETE", `'${name}'`, req.session.username);
+  res.json({ ok: true });
+});
+
+/** GET /api/projects/image/:filename — authenticated file serve. */
+router.get("/image/:filename", requireAuth, (req, res) => {
+  const resolved = resolveProjectImagePath(req.params.filename);
+  if (!resolved) return res.status(404).json({ ok: false, error: "Not found" });
+  res.sendFile(path.resolve(resolved));
 });
 
 /**

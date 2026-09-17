@@ -21,6 +21,21 @@ function toBool(s) {
   return ["t", "true", "1", "yes", "y"].includes(String(s || "").trim().toLowerCase());
 }
 
+/** Normalizes either boolean-ish ("true"/"1") or Yes/No text into the model's stored "Yes" | "No" | "" convention. */
+function toYesNo(s) {
+  const v = String(s || "").trim().toLowerCase();
+  if (["t", "true", "1", "yes", "y"].includes(v)) return "Yes";
+  if (["f", "false", "0", "no", "n"].includes(v)) return "No";
+  return "";
+}
+
+/** Clamped 0-100 integer, defaulting to 0 for blank/invalid input. */
+function toPercentage(s) {
+  const n = parseInt(s, 10);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(100, Math.max(0, n));
+}
+
 /** Accepts 'YYYY-MM-DD[ HH:MM:SS[.ffffff]]' or 'MM-DD-YYYY[ HH:MM:SS]'; returns a Date or null. */
 function parseFlexibleDateTime(s) {
   const str = String(s ?? "").trim();
@@ -160,7 +175,7 @@ const HANDLERS = {
       const [
         legacyIdRaw, project, submissionName, client, submissionType, team,
         subDate, dueDate, remarks, status, createdAt, completedAt, createdBy,
-        qaqc, backComment, furtherComment, billable,
+        qaqc, backComment, furtherComment, percentage, billable, invoiceReleased,
       ] = row;
       const legacyId = parseInt(legacyIdRaw, 10);
       if (!legacyId || !project) {
@@ -168,7 +183,6 @@ const HANDLERS = {
         continue;
       }
       maxLegacyId = Math.max(maxLegacyId, legacyId);
-      const billableValue = toBool(billable) ? "Yes" : "";
       try {
         const result = await Record.updateOne(
           { legacyId },
@@ -189,7 +203,9 @@ const HANDLERS = {
             qaqc: qaqc || "",
             backComment: backComment || "",
             furtherComment: furtherComment || "",
-            ...(billableValue ? { billable: billableValue } : {}),
+            percentage: toPercentage(percentage),
+            billable: toYesNo(billable),
+            invoiceReleased: toYesNo(invoiceReleased),
           },
           { upsert: true }
         );
@@ -199,9 +215,9 @@ const HANDLERS = {
         // Same auto-CO behavior as the normal Add/Edit Record form — a
         // billable submission gets its own Change Order, skipped if one
         // already exists for this legacyId (see ensureBillableChangeOrder).
-        if (billableValue === "Yes") {
+        if (toYesNo(billable) === "Yes") {
           const created = await ensureBillableChangeOrder(
-            { legacyId, project: project || "", team: team || "", subDate: parseFlexibleDateTime(subDate), submissionName: submissionName || "", billable: billableValue },
+            { legacyId, project: project || "", team: team || "", subDate: parseFlexibleDateTime(subDate), submissionName: submissionName || "", billable: "Yes" },
             uploadedBy || createdBy || ""
           );
           if (created) changeOrdersCreated++;
@@ -354,7 +370,7 @@ const COLLECTIONS = [
   { key: "clients", label: "Clients", columns: "name" },
   { key: "clients_projects", label: "Clients & Projects (creates/links both)", columns: "client, project" },
   { key: "users", label: "Users", columns: "username, password, role, allowed_teams, cross_team, linked_tls, default_tl, birthday" },
-  { key: "records", label: "Records", columns: "id, project, submission_name, client, submission_type, team, sub_date, due_date, remarks, status, created_at, completed_at, created_by, qaqc, back_comment, further_comment, billable" },
+  { key: "records", label: "Records", columns: "id, project, submission_name, client, submission_type, team, sub_date, due_date, remarks, status, created_at, completed_at, created_by, qaqc, back_comment, further_comment, percentage, billable, invoice_released" },
   { key: "hold_data", label: "Hold Data (merges into Records)", columns: "record_id, hold_text, image_filename, hold_user, hold_ts" },
   { key: "activity_log", label: "Activity Log", columns: "id, ts, username, action, detail" },
   { key: "notifications", label: "Notifications", columns: "id, ts, by_user, action, detail, seen_by" },
@@ -385,7 +401,7 @@ const SAMPLES = {
   ],
   users: [["jdoe", "changeme", "team_lead", "Team Alpha,Team Bravo", "false", "", "", "1990-05-12"]],
   records: [
-    ["1001", "2516 City Of Tampa", "Anchor bolt field work dwgs", "Morrow Steel", "FAB", "Dhanil Kumar", "2026-04-14", "2026-04-14", "", "", "2026-04-01", "", "admin", "No", "No", "No", "true"],
+    ["1001", "2516 City Of Tampa", "Anchor bolt field work dwgs", "Morrow Steel", "FAB", "Dhanil Kumar", "2026-04-14", "2026-04-14", "", "", "2026-04-01", "", "admin", "No", "No", "No", "35", "Yes", "No"],
   ],
   hold_data: [["1001", "Waiting on client approval", "", "admin", "2026-04-15 09:30:00"]],
 };

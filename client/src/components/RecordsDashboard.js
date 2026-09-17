@@ -93,8 +93,6 @@ export default function RecordsDashboard() {
   const [sort, setSort] = useState({ col: "", dir: "asc" });
   const [dates, setDates] = useState([]);
   const [customRange, setCustomRange] = useState({ from: "", to: "" });
-  const [customRangeOpen, setCustomRangeOpen] = useState(false);
-  const [customRangeDraft, setCustomRangeDraft] = useState({ from: "", to: "" });
 
   const queryParams = {
     page,
@@ -256,23 +254,14 @@ export default function RecordsDashboard() {
     setPage(1);
   }
 
-  function openCustomRange() {
-    setCustomRangeDraft(customRange);
-    setCustomRangeOpen(true);
-  }
-
-  function applyCustomRange(e) {
-    e.preventDefault();
-    setCustomRange(customRangeDraft);
-    if (customRangeDraft.from || customRangeDraft.to) setDates([]);
-    setCustomRangeOpen(false);
+  function setCustomRangeValue(next) {
+    setCustomRange(next);
+    if (next.from || next.to) setDates([]);
     setPage(1);
   }
 
   function clearCustomRange() {
     setCustomRange({ from: "", to: "" });
-    setCustomRangeDraft({ from: "", to: "" });
-    setCustomRangeOpen(false);
     setPage(1);
   }
 
@@ -507,43 +496,28 @@ export default function RecordsDashboard() {
       <div className="d-flex flex-wrap gap-2 align-items-center mb-2">
         <div className="section-title mb-0"><i className="bi bi-table" /> Records ({data?.total ?? 0} record{data?.total === 1 ? "" : "s"})</div>
         <div className="ms-auto d-flex flex-wrap gap-2 align-items-center">
-          <div className="position-relative">
-            <button
-              type="button"
-              className={`date-btn custom-toggle${customRange.from || customRange.to ? " active custom" : ""}`}
-              onClick={() => (customRangeOpen ? setCustomRangeOpen(false) : openCustomRange())}
-            >
-              <i className="bi bi-calendar-range" /> Custom
-            </button>
-            {customRangeOpen && (
-              <form
-                className="card-form position-absolute mt-1 p-2 shadow-sm"
-                style={{ zIndex: 20, width: 260, top: "100%", left: 0 }}
-                onSubmit={applyCustomRange}
-              >
-                <div className="mb-2">
-                  <label className="form-label small mb-1">From</label>
-                  <input
-                    type="date"
-                    className="form-control form-control-sm"
-                    value={customRangeDraft.from}
-                    onChange={(e) => setCustomRangeDraft((f) => ({ ...f, from: e.target.value }))}
-                  />
-                </div>
-                <div className="mb-2">
-                  <label className="form-label small mb-1">To</label>
-                  <input
-                    type="date"
-                    className="form-control form-control-sm"
-                    value={customRangeDraft.to}
-                    onChange={(e) => setCustomRangeDraft((f) => ({ ...f, to: e.target.value }))}
-                  />
-                </div>
-                <div className="d-flex gap-2">
-                  <button type="submit" className="btn btn-sm btn-dark flex-fill">Apply</button>
-                  <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearCustomRange}>Clear</button>
-                </div>
-              </form>
+          <div className={`date-range-inline${customRange.from || customRange.to ? " active" : ""}`}>
+            <i className="bi bi-calendar3 date-range-icon" />
+            <input
+              type="date"
+              className="date-range-input"
+              value={customRange.from}
+              onChange={(e) => setCustomRangeValue({ from: e.target.value, to: customRange.to })}
+              aria-label="From date"
+            />
+            <i className="bi bi-arrow-right date-range-sep" />
+            <i className="bi bi-calendar3 date-range-icon" />
+            <input
+              type="date"
+              className="date-range-input"
+              value={customRange.to}
+              onChange={(e) => setCustomRangeValue({ from: customRange.from, to: e.target.value })}
+              aria-label="To date"
+            />
+            {(customRange.from || customRange.to) && (
+              <button type="button" className="date-range-clear" onClick={clearCustomRange} aria-label="Clear date range">
+                <i className="bi bi-x-lg" />
+              </button>
             )}
           </div>
           <div className="date-btn-group">

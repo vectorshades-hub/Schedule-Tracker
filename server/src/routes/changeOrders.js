@@ -73,6 +73,15 @@ function toRow(co) {
     invoice_released_reason: co.invoiceReleasedReason || "",
     invoice_released_by: co.invoiceReleasedBy || "",
     invoice_released_at: co.invoiceReleasedAt ? new Date(co.invoiceReleasedAt).toISOString() : "",
+    currency: co.currency || "USD",
+    amount: co.amount ?? 0,
+    total: co.total ?? 0,
+    released_to_finance: !!co.releasedToFinance,
+    released_to_finance_by: co.releasedToFinanceBy || "",
+    released_to_finance_at: co.releasedToFinanceAt ? new Date(co.releasedToFinanceAt).toISOString() : "",
+    finance_acknowledged: !!co.financeAcknowledged,
+    finance_acknowledged_by: co.financeAcknowledgedBy || "",
+    finance_acknowledged_at: co.financeAcknowledgedAt ? new Date(co.financeAcknowledgedAt).toISOString() : "",
     created_by: co.createdBy || "",
     created_at: co.createdAt ? new Date(co.createdAt).toISOString() : "",
     updated_by: co.updatedBy || "",
@@ -106,6 +115,9 @@ router.post("/", requireRole("admin", "management"), async (req, res) => {
     }
 
     const hours = Number(b.hours);
+    const hoursVal = Number.isFinite(hours) ? hours : 0;
+    const amount = Number(b.amount);
+    const amountVal = Number.isFinite(amount) ? amount : 0;
     const co = await ChangeOrder.create({
       project,
       coNumber,
@@ -113,9 +125,12 @@ router.post("/", requireRole("admin", "management"), async (req, res) => {
       date: statusEngine.parseDate(dateRaw),
       changeType,
       notes: String(b.notes || "").trim(),
-      hours: Number.isFinite(hours) ? hours : 0,
+      hours: hoursVal,
       approval: ["Pending", "Approved", "Rejected"].includes(b.approval) ? b.approval : "Pending",
       billed: !!b.billed,
+      currency: String(b.currency || "USD").trim() || "USD",
+      amount: amountVal,
+      total: hoursVal * amountVal,
       createdBy: user,
       createdAt: new Date(),
     });
@@ -143,6 +158,9 @@ router.put("/:id", requireRole("admin", "management"), async (req, res) => {
     }
 
     const hours = Number(b.hours);
+    const hoursVal = Number.isFinite(hours) ? hours : 0;
+    const amount = Number(b.amount);
+    const amountVal = Number.isFinite(amount) ? amount : 0;
     const co = await ChangeOrder.findByIdAndUpdate(
       req.params.id,
       {
@@ -152,9 +170,12 @@ router.put("/:id", requireRole("admin", "management"), async (req, res) => {
         date: statusEngine.parseDate(dateRaw),
         changeType,
         notes: String(b.notes || "").trim(),
-        hours: Number.isFinite(hours) ? hours : 0,
+        hours: hoursVal,
         approval: ["Pending", "Approved", "Rejected"].includes(b.approval) ? b.approval : "Pending",
         billed: !!b.billed,
+        currency: String(b.currency || "USD").trim() || "USD",
+        amount: amountVal,
+        total: hoursVal * amountVal,
         updatedBy: user,
         updatedAt: new Date(),
       },
@@ -269,6 +290,76 @@ router.post("/:id/invoice-released", requireAuth, async (req, res) => {
     writeLog(
       "CHANGE-ORDER-INVOICE-RELEASED",
       `co='${co.coNumber}' invoice_released='${value || "(not set)"}'${value === "No" ? ` reason='${reason}'` : ""}`,
+      req.session.username
+    );
+    res.json({ ok: true, change_order: toRow(co) });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/**
+ * POST /api/change-orders/:id/release-to-finance — hands a CO off to the
+ * Finance dashboard (admin/management only, a plain role split rather than
+ * a Settings permission list). Un-releasing (released:false) also clears any
+ * finance acknowledgement, since an unreleased CO has nothing to acknowledge.
+ */
+router.post("/:id/release-to-finance", requireRole("admin", "management"), async (req, res) => {
+  const released = !!req.body.released;
+  try {
+    const update = {
+      releasedToFinance: released,
+      releasedToFinanceBy: req.session.username,
+      releasedToFinanceAt: new Date(),
+      updatedBy: req.session.username,
+      updatedAt: new Date(),
+    };
+    if (!released) {
+      update.financeAcknowledged = false;
+      update.financeAcknowledgedBy = "";
+      update.financeAcknowledgedAt = null;
+    }
+    const co = await ChangeOrder.findByIdAndUpdate(req.params.id, update, { new: true });
+    if (!co) return res.status(404).json({ ok: false, error: "Change order not found." });
+
+    writeLog(
+      "CHANGE-ORDER-RELEASE-TO-FINANCE",
+      `co='${co.coNumber}' released_to_finance='${released}'`,
+      req.session.username
+    );
+    res.json({ ok: true, change_order: toRow(co) });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/**
+ * POST /api/change-orders/:id/finance-acknowledge — Finance (or admin)
+ * acknowledges a CO already released to finance. Feeds back onto the
+ * Management Dashboard's own Acknowledged column.
+ */
+router.post("/:id/finance-acknowledge", requireRole("admin", "finance"), async (req, res) => {
+  try {
+    const existing = await ChangeOrder.findById(req.params.id);
+    if (!existing) return res.status(404).json({ ok: false, error: "Change order not found." });
+    if (!existing.releasedToFinance) {
+      return res.status(400).json({ ok: false, error: "This change order hasn't been released to finance yet." });
+    }
+
+    const acknowledged = req.body.acknowledged === undefined ? true : !!req.body.acknowledged;
+    const co = await ChangeOrder.findByIdAndUpdate(
+      req.params.id,
+      {
+        financeAcknowledged: acknowledged,
+        financeAcknowledgedBy: req.session.username,
+        financeAcknowledgedAt: new Date(),
+      },
+      { new: true }
+    );
+
+    writeLog(
+      "CHANGE-ORDER-FINANCE-ACKNOWLEDGE",
+      `co='${co.coNumber}' finance_acknowledged='${acknowledged}'`,
       req.session.username
     );
     res.json({ ok: true, change_order: toRow(co) });

@@ -14,6 +14,7 @@ export const STATUS_STYLES = {
 export const ROLE_BADGE_STYLES = {
   admin: { bg: "#ffc107", fg: "#000" },
   management: { bg: "#0dcaf0", fg: "#000" },
+  finance: { bg: "#20c997", fg: "#000" },
   team_lead: { bg: "#198754", fg: "#fff" },
   qaqc: { bg: "#7c3aed", fg: "#fff" },
   user: { bg: "#6c757d", fg: "#fff" },

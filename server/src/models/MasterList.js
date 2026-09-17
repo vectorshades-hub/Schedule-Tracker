@@ -35,6 +35,14 @@ const projectSchema = new mongoose.Schema({
   ofaCompletedAt: { type: Date, default: null },
   fabCompleted: { type: Boolean, default: false },
   fabCompletedAt: { type: Date, default: null },
+  // Filename of the project's cover/reference image (see fileStorage.js's
+  // PROJECT_IMAGES_DIR) — empty string means no image uploaded yet.
+  imageFilename: { type: String, default: "" },
+  // Hours quoted to the client for the base scope of this project — set by
+  // whoever can edit records (settingsService.canUpdateRecords), shown next
+  // to the project name alongside the CO earnings summary. Separate from any
+  // individual Change Order's own `hours`.
+  quotedHours: { type: Number, default: 0 },
 });
 const Project = mongoose.model("Project", projectSchema);
 const Client = mongoose.model("Client", new mongoose.Schema(nameSchema));

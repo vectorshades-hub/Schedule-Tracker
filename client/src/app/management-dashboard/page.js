@@ -7,7 +7,7 @@ import StatPill from "../../components/StatPill";
 import Modal from "../../components/Modal";
 import SearchableDropdown from "../../components/SearchableDropdown";
 import { useAuth } from "../../lib/AuthContext";
-import { useManagementDashboardChangeOrders, useSetInvoiceReleased } from "../../hooks/useManagementDashboard";
+import { useManagementDashboardChangeOrders, useSetInvoiceReleased, useReleaseToFinance } from "../../hooks/useManagementDashboard";
 import { ApiError } from "../../lib/api";
 import { useToast } from "../../lib/ToastContext";
 
@@ -36,6 +36,7 @@ export default function ManagementDashboardPage() {
 
   const canSeeDashboard = !!user && (["admin", "management"].includes(user.role) || user.can_edit_invoice_released);
   const canEdit = !!user?.can_edit_invoice_released;
+  const canReleaseToFinance = !!user && ["admin", "management"].includes(user.role);
 
   useEffect(() => {
     if (loading) return;
@@ -60,6 +61,7 @@ export default function ManagementDashboardPage() {
     search: search || undefined,
   });
   const setInvoiceReleased = useSetInvoiceReleased();
+  const releaseToFinance = useReleaseToFinance();
 
   const changeOrders = data?.change_orders || [];
   const projectOptions = data?.projects || [];
@@ -85,6 +87,15 @@ export default function ManagementDashboardPage() {
       toast.success("Invoice Released updated.");
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Failed to update Invoice Released.");
+    }
+  }
+
+  async function handleReleaseToFinance(co) {
+    try {
+      await releaseToFinance.mutateAsync({ id: co.id, released: true });
+      toast.success(`CO${co.co_number} released to finance.`);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Failed to release to finance.");
     }
   }
 
@@ -138,11 +149,16 @@ export default function ManagementDashboardPage() {
               <th>CO #</th>
               <th>Date</th>
               <th>Change Type</th>
+              <th>Currency</th>
               <th>Hours</th>
+              <th>Amount</th>
+              <th>Total</th>
               <th>Approval</th>
               <th>Billed</th>
               <th>Invoice Released</th>
               <th>Reason (if No)</th>
+              <th>Released to Finance</th>
+              <th>Acknowledged</th>
               <th></th>
             </tr>
           </thead>
@@ -151,10 +167,13 @@ export default function ManagementDashboardPage() {
               <tr key={co.id}>
                 <td><a href={`/projects/${encodeURIComponent(co.project)}`}>{co.project}</a></td>
                 <td>{co.client || "—"}</td>
-                <td>CO#{co.co_number}</td>
+                <td>CO{co.co_number}</td>
                 <td>{co.date || "—"}</td>
                 <td>{co.change_type || "—"}</td>
+                <td>{co.currency || "USD"}</td>
                 <td>{Number(co.hours ?? 0).toFixed(2)}</td>
+                <td>{Number(co.amount ?? 0).toFixed(2)}</td>
+                <td>{Number(co.total ?? 0).toFixed(2)}</td>
                 <td>
                   <span className={`co-status-pill co-status-${co.approval.toLowerCase()}`}>{co.approval}</span>
                 </td>
@@ -163,6 +182,36 @@ export default function ManagementDashboardPage() {
                   <InvoiceReleasedBadge value={co.invoice_released} />
                 </td>
                 <td className="text-muted small">{co.invoice_released === "No" ? co.invoice_released_reason || "—" : "—"}</td>
+                <td>
+                  {co.released_to_finance ? (
+                    <span className="badge bg-success" title={co.released_to_finance_by ? `By ${co.released_to_finance_by}` : ""}>
+                      Yes
+                    </span>
+                  ) : canReleaseToFinance ? (
+                    <button
+                      className="btn btn-sm btn-outline-success"
+                      disabled={releaseToFinance.isPending}
+                      onClick={() => handleReleaseToFinance(co)}
+                    >
+                      <i className="bi bi-send" /> Release
+                    </button>
+                  ) : (
+                    <span className="badge bg-secondary">No</span>
+                  )}
+                </td>
+                <td>
+                  {co.released_to_finance ? (
+                    co.finance_acknowledged ? (
+                      <span className="badge bg-success" title={co.finance_acknowledged_by ? `By ${co.finance_acknowledged_by}` : ""}>
+                        Yes
+                      </span>
+                    ) : (
+                      <span className="badge bg-secondary">No</span>
+                    )
+                  ) : (
+                    <span className="text-muted">—</span>
+                  )}
+                </td>
                 <td>
                   {canEdit && (
                     <button className="btn btn-sm btn-outline-primary" onClick={() => setEditTarget(co)}>
@@ -174,7 +223,7 @@ export default function ManagementDashboardPage() {
             ))}
             {!changeOrders.length && !isFetching && (
               <tr>
-                <td colSpan={11} className="text-center text-muted py-4">
+                <td colSpan={16} className="text-center text-muted py-4">
                   No Change Orders match this filter.
                 </td>
               </tr>
@@ -237,7 +286,7 @@ function InvoiceReleasedModal({ co, onClose, onSave, saving }) {
     <Modal
       open={!!co}
       onClose={onClose}
-      title={`Invoice Released — CO#${co?.co_number ?? ""}`}
+      title={`Invoice Released — CO${co?.co_number ?? ""}`}
       maxWidth={480}
       footer={
         <>

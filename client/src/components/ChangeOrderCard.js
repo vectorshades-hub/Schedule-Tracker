@@ -21,7 +21,7 @@ export default function ChangeOrderCard({ co, canEdit, canDelete, onEdit, onDele
     <div className="co-card">
       <div className="co-card-top">
         <div className="co-card-left">
-          <span className="co-number-pill">CO#{co.co_number}</span>
+          <span className="co-number-pill">CO{co.co_number}</span>
           <span className="co-change-type">{co.change_type}</span>
         </div>
         <div className="co-card-actions">
@@ -55,8 +55,11 @@ export default function ChangeOrderCard({ co, canEdit, canDelete, onEdit, onDele
         <span className="co-chip">
           <i className="bi bi-clock" /> <span className="co-chip-label">Hours</span> {Number(co.hours ?? 0).toFixed(2)}
         </span>
+        <span className="co-chip">
+          <i className="bi bi-currency-dollar" /> <span className="co-chip-label">Total</span> {co.currency || "USD"} {Number(co.total ?? 0).toFixed(2)}
+        </span>
         <span className="co-chip co-chip-muted">
-          <i className="bi bi-currency-dollar" /> <span className="co-chip-label">Billed</span> {co.billed ? "Yes" : "No"}
+          <i className="bi bi-receipt" /> <span className="co-chip-label">Billed</span> {co.billed ? "Yes" : "No"}
         </span>
       </div>
 

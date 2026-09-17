@@ -19,6 +19,7 @@ export default function UserRoleFields({ form, setForm, teamLeadAndMgmtUsernames
         <select className="form-select" value={form.role} onChange={(e) => set({ role: e.target.value })}>
           <option value="team_lead">Team Lead</option>
           <option value="management">Management</option>
+          <option value="finance">Finance</option>
           <option value="qaqc">QAQC</option>
           <option value="user">User</option>
           <option value="admin">Admin</option>
