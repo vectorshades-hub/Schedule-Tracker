@@ -19,12 +19,14 @@ const env = require("../config/env");
 const router = createSafeRouter();
 
 /**
- * GET /api/projects — list projects + clients master lists (admin/management/team_lead).
- * `projects`/`clients` stay flat name arrays for existing consumers (record
- * forms, reports, drilldowns); `projectDetails` adds each project's client
- * for the Manage Projects & Clients page's grouped view.
+ * GET /api/projects — list projects + clients master lists. Read-only, and
+ * needed by every role's record forms (the project/client pickers), not
+ * just admin/management/team_lead — `projects`/`clients` stay flat name
+ * arrays for existing consumers (record forms, reports, drilldowns);
+ * `projectDetails` adds each project's client for the Manage Projects &
+ * Clients page's grouped view.
  */
-router.get("/", requireRole("admin", "management", "team_lead"), async (req, res) => {
+router.get("/", requireAuth, async (req, res) => {
   const [projects, clients] = await Promise.all([
     Project.find({}).sort({ name: 1 }).lean(),
     Client.find({}).sort({ name: 1 }).lean(),
@@ -48,7 +50,7 @@ router.get("/", requireRole("admin", "management", "team_lead"), async (req, res
  * signed off yet, so a missing doc 404s only when there are no records
  * under that name either — otherwise it reports the all-false default.
  */
-router.get("/:name", requireRole("admin", "management", "team_lead"), async (req, res) => {
+router.get("/:name", requireAuth, async (req, res) => {
   const name = decodeURIComponent(req.params.name);
   const p = await Project.findOne({ name }).lean();
   if (!p) {

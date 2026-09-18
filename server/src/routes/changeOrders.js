@@ -258,6 +258,11 @@ router.post("/:id/billed", requireRole("admin", "management"), async (req, res) 
  * Invoice Released field — see settingsService.canEditInvoiceReleased — not
  * a role check, since a non-management user can be individually granted
  * this via the Settings page.
+ *
+ * Setting it to "Yes" also auto-releases the CO to Finance (if it hasn't
+ * been already) — an invoice can't really be released before finance has
+ * it, so the two workflows would otherwise drift out of sync waiting on a
+ * separate manual "Release" click for something that's already happened.
  */
 router.post("/:id/invoice-released", requireAuth, async (req, res) => {
   const allowed = await canEditInvoiceReleased(req.session.userId, req.session.role);
@@ -273,25 +278,38 @@ router.post("/:id/invoice-released", requireAuth, async (req, res) => {
   }
 
   try {
-    const co = await ChangeOrder.findByIdAndUpdate(
-      req.params.id,
-      {
-        invoiceReleased: value,
-        invoiceReleasedReason: value === "No" ? reason : "",
-        invoiceReleasedBy: req.session.username,
-        invoiceReleasedAt: new Date(),
-        updatedBy: req.session.username,
-        updatedAt: new Date(),
-      },
-      { new: true }
-    );
-    if (!co) return res.status(404).json({ ok: false, error: "Change order not found." });
+    const existing = await ChangeOrder.findById(req.params.id);
+    if (!existing) return res.status(404).json({ ok: false, error: "Change order not found." });
+
+    const update = {
+      invoiceReleased: value,
+      invoiceReleasedReason: value === "No" ? reason : "",
+      invoiceReleasedBy: req.session.username,
+      invoiceReleasedAt: new Date(),
+      updatedBy: req.session.username,
+      updatedAt: new Date(),
+    };
+    const autoReleasedToFinance = value === "Yes" && !existing.releasedToFinance;
+    if (autoReleasedToFinance) {
+      update.releasedToFinance = true;
+      update.releasedToFinanceBy = req.session.username;
+      update.releasedToFinanceAt = new Date();
+    }
+
+    const co = await ChangeOrder.findByIdAndUpdate(req.params.id, update, { new: true });
 
     writeLog(
       "CHANGE-ORDER-INVOICE-RELEASED",
       `co='${co.coNumber}' invoice_released='${value || "(not set)"}'${value === "No" ? ` reason='${reason}'` : ""}`,
       req.session.username
     );
+    if (autoReleasedToFinance) {
+      writeLog(
+        "CHANGE-ORDER-RELEASE-TO-FINANCE",
+        `co='${co.coNumber}' released_to_finance='true' (auto, invoice released)`,
+        req.session.username
+      );
+    }
     res.json({ ok: true, change_order: toRow(co) });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });

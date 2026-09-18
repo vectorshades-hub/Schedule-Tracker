@@ -7,9 +7,10 @@ import StatPill from "../../components/StatPill";
 import Modal from "../../components/Modal";
 import SearchableDropdown from "../../components/SearchableDropdown";
 import { useAuth } from "../../lib/AuthContext";
-import { useManagementDashboardChangeOrders, useSetInvoiceReleased, useReleaseToFinance } from "../../hooks/useManagementDashboard";
+import { useManagementDashboardChangeOrders, useSetInvoiceReleased } from "../../hooks/useManagementDashboard";
 import { ApiError } from "../../lib/api";
 import { useToast } from "../../lib/ToastContext";
+import { getChangeOrderStatus } from "../../lib/changeOrderStatus";
 
 // "not_set" (not "") is its own token because the api.js fetch wrapper strips
 // any query param whose value is "" — sending status="" would be silently
@@ -36,7 +37,6 @@ export default function ManagementDashboardPage() {
 
   const canSeeDashboard = !!user && (["admin", "management"].includes(user.role) || user.can_edit_invoice_released);
   const canEdit = !!user?.can_edit_invoice_released;
-  const canReleaseToFinance = !!user && ["admin", "management"].includes(user.role);
 
   useEffect(() => {
     if (loading) return;
@@ -61,7 +61,6 @@ export default function ManagementDashboardPage() {
     search: search || undefined,
   });
   const setInvoiceReleased = useSetInvoiceReleased();
-  const releaseToFinance = useReleaseToFinance();
 
   const changeOrders = data?.change_orders || [];
   const projectOptions = data?.projects || [];
@@ -81,21 +80,14 @@ export default function ManagementDashboardPage() {
   }
 
   async function handleSave(id, invoiceReleased, reason) {
+    const wasReleasedToFinance = !!editTarget?.released_to_finance;
     try {
-      await setInvoiceReleased.mutateAsync({ id, invoiceReleased, reason });
+      const res = await setInvoiceReleased.mutateAsync({ id, invoiceReleased, reason });
       setEditTarget(null);
-      toast.success("Invoice Released updated.");
+      const autoReleased = invoiceReleased === "Yes" && !wasReleasedToFinance && res?.change_order?.released_to_finance;
+      toast.success(autoReleased ? "Invoice Released updated — CO auto-released to Finance." : "Invoice Released updated.");
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Failed to update Invoice Released.");
-    }
-  }
-
-  async function handleReleaseToFinance(co) {
-    try {
-      await releaseToFinance.mutateAsync({ id: co.id, released: true });
-      toast.success(`CO${co.co_number} released to finance.`);
-    } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Failed to release to finance.");
     }
   }
 
@@ -140,8 +132,8 @@ export default function ManagementDashboardPage() {
         </div>
       </div>
 
-      <div className="table-responsive">
-        <table className="table table-hover align-middle">
+      <div className="table-wrap theme-navyblue">
+        <table className="table table-hover align-middle mb-0">
           <thead>
             <tr>
               <th>Project</th>
@@ -149,16 +141,11 @@ export default function ManagementDashboardPage() {
               <th>CO #</th>
               <th>Date</th>
               <th>Change Type</th>
-              <th>Currency</th>
               <th>Hours</th>
-              <th>Amount</th>
+              <th>Rate</th>
               <th>Total</th>
-              <th>Approval</th>
-              <th>Billed</th>
+              <th>Status</th>
               <th>Invoice Released</th>
-              <th>Reason (if No)</th>
-              <th>Released to Finance</th>
-              <th>Acknowledged</th>
               <th></th>
             </tr>
           </thead>
@@ -167,50 +154,17 @@ export default function ManagementDashboardPage() {
               <tr key={co.id}>
                 <td><a href={`/projects/${encodeURIComponent(co.project)}`}>{co.project}</a></td>
                 <td>{co.client || "—"}</td>
-                <td>CO{co.co_number}</td>
-                <td>{co.date || "—"}</td>
+                <td className="fw-semibold">CO{co.co_number}</td>
+                <td className="text-nowrap">{co.date || "—"}</td>
                 <td>{co.change_type || "—"}</td>
-                <td>{co.currency || "USD"}</td>
                 <td>{Number(co.hours ?? 0).toFixed(2)}</td>
-                <td>{Number(co.amount ?? 0).toFixed(2)}</td>
-                <td>{Number(co.total ?? 0).toFixed(2)}</td>
+                <td className="text-nowrap">{co.currency || "USD"} {Number(co.amount ?? 0).toFixed(2)}</td>
+                <td className="text-nowrap fw-semibold">{co.currency || "USD"} {Number(co.total ?? 0).toFixed(2)}</td>
                 <td>
-                  <span className={`co-status-pill co-status-${co.approval.toLowerCase()}`}>{co.approval}</span>
-                </td>
-                <td>{co.billed ? "Yes" : "No"}</td>
-                <td>
-                  <InvoiceReleasedBadge value={co.invoice_released} />
-                </td>
-                <td className="text-muted small">{co.invoice_released === "No" ? co.invoice_released_reason || "—" : "—"}</td>
-                <td>
-                  {co.released_to_finance ? (
-                    <span className="badge bg-success" title={co.released_to_finance_by ? `By ${co.released_to_finance_by}` : ""}>
-                      Yes
-                    </span>
-                  ) : canReleaseToFinance ? (
-                    <button
-                      className="btn btn-sm btn-outline-success"
-                      disabled={releaseToFinance.isPending}
-                      onClick={() => handleReleaseToFinance(co)}
-                    >
-                      <i className="bi bi-send" /> Release
-                    </button>
-                  ) : (
-                    <span className="badge bg-secondary">No</span>
-                  )}
+                  <CoStatusCell co={co} />
                 </td>
                 <td>
-                  {co.released_to_finance ? (
-                    co.finance_acknowledged ? (
-                      <span className="badge bg-success" title={co.finance_acknowledged_by ? `By ${co.finance_acknowledged_by}` : ""}>
-                        Yes
-                      </span>
-                    ) : (
-                      <span className="badge bg-secondary">No</span>
-                    )
-                  ) : (
-                    <span className="text-muted">—</span>
-                  )}
+                  <InvoiceReleasedBadge value={co.invoice_released} reason={co.invoice_released_reason} />
                 </td>
                 <td>
                   {canEdit && (
@@ -223,7 +177,7 @@ export default function ManagementDashboardPage() {
             ))}
             {!changeOrders.length && !isFetching && (
               <tr>
-                <td colSpan={16} className="text-center text-muted py-4">
+                <td colSpan={11} className="text-center text-muted py-4">
                   No Change Orders match this filter.
                 </td>
               </tr>
@@ -260,9 +214,29 @@ export default function ManagementDashboardPage() {
   );
 }
 
-function InvoiceReleasedBadge({ value }) {
+/** Status column — the same 3-state finance lifecycle shown on the project
+ * detail page's Change Order cards (see lib/changeOrderStatus). No manual
+ * "Release" action here — a CO moves to Sent to Finance automatically as
+ * soon as Invoice Released is set to Yes (see routes/changeOrders.js). */
+function CoStatusCell({ co }) {
+  const status = getChangeOrderStatus(co);
+  return (
+    <span className={`co-status-pill co-status-${status.key}`}>
+      <i className={`bi ${status.icon}`} /> {status.label}
+    </span>
+  );
+}
+
+/** Reason (required whenever Invoice Released is "No") is surfaced as a
+ * hover tooltip on the badge rather than its own mostly-empty column. */
+function InvoiceReleasedBadge({ value, reason }) {
   if (value === "Yes") return <span className="badge bg-success">Yes</span>;
-  if (value === "No") return <span className="badge bg-danger">No</span>;
+  if (value === "No")
+    return (
+      <span className="badge bg-danger" title={reason || "No reason given"}>
+        No {reason && <i className="bi bi-info-circle-fill ms-1" />}
+      </span>
+    );
   return <span className="badge bg-secondary">Not Set</span>;
 }
 

@@ -15,8 +15,12 @@ export function useSetInvoiceReleased() {
   return useMutation({
     mutationFn: ({ id, invoiceReleased, reason }) =>
       api.post(`/change-orders/${id}/invoice-released`, { invoice_released: invoiceReleased, reason }),
+    // Setting Invoice Released to "Yes" can auto-release the CO to Finance
+    // (see routes/changeOrders.js), so the Finance Dashboard's own query
+    // needs invalidating too, not just this dashboard's.
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["management-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["finance-dashboard"] });
       qc.invalidateQueries({ queryKey: ["change-orders"] });
     },
   });

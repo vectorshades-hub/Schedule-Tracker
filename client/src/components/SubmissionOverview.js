@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useAuth } from "../lib/AuthContext";
 import { useToast } from "../lib/ToastContext";
 import { api, ApiError, API_URL } from "../lib/api";
 import { useDashboardConfig } from "../hooks/useRecords";
@@ -8,8 +9,6 @@ import {
   useCreateChangeOrder,
   useUpdateChangeOrder,
   useDeleteChangeOrder,
-  useSetChangeOrderApproval,
-  useToggleChangeOrderBilled,
 } from "../hooks/useChangeOrders";
 import { useRfis, useCreateRfi, useUpdateRfi, useDeleteRfi, useSetRfiResponseReceived } from "../hooks/useRfis";
 import { useProjectActivity } from "../hooks/useActivityLog";
@@ -24,6 +23,7 @@ import {
   OFA_TYPES,
   FAB_TYPES,
 } from "../lib/projectLifecycle";
+import { CHANGE_ORDER_STATUSES, getChangeOrderStatus } from "../lib/changeOrderStatus";
 import StatusBadge from "./StatusBadge";
 import Modal from "./Modal";
 import CreateChangeOrderModal from "./CreateChangeOrderModal";
@@ -204,6 +204,8 @@ export default function SubmissionOverview({
   onDeleteRecord,
 }) {
   const toast = useToast();
+  const { user } = useAuth();
+  const showCoTotal = user?.role !== "user";
   const [coModalOpen, setCoModalOpen] = useState(false);
   const [editingCO, setEditingCO] = useState(null); // the CO row being edited, or null (create mode)
   const [deleteTargetCO, setDeleteTargetCO] = useState(null);
@@ -211,7 +213,7 @@ export default function SubmissionOverview({
   const [editingRfi, setEditingRfi] = useState(null); // the RFI row being edited, or null (create mode)
   const [deleteTargetRfi, setDeleteTargetRfi] = useState(null);
   const [rfiFilter, setRfiFilter] = useState("All"); // "All" | "Pending" | "Overdue" | "Returned"
-  const [coFilter, setCoFilter] = useState("All"); // "All" | "Pending" | "Approved" | "Rejected" | "Billed"
+  const [coFilter, setCoFilter] = useState("All"); // "All" or a CHANGE_ORDER_STATUSES key
   const [subTypeFilter, setSubTypeFilter] = useState(""); // "" (all) or a submission_type
   const [subCompletedFilter, setSubCompletedFilter] = useState(""); // "" (all) | "Completed" | "Not Completed"
   const [pendingAction, setPendingAction] = useState(null); // { title, message, run } — confirm before Approve/Reject/Billed/Response toggles
@@ -221,8 +223,6 @@ export default function SubmissionOverview({
   const createCO = useCreateChangeOrder();
   const updateCO = useUpdateChangeOrder();
   const deleteCO = useDeleteChangeOrder();
-  const setCOApproval = useSetChangeOrderApproval();
-  const toggleCOBilled = useToggleChangeOrderBilled();
   const { data: coDashboardConfig } = useDashboardConfig({});
   const { data: rfiData, refetch: refetchRfis } = useRfis(projectName);
   const createRfi = useCreateRfi();
@@ -329,41 +329,6 @@ export default function SubmissionOverview({
     setPendingAction(null);
   }
 
-  async function handleSetApproval(co, approval) {
-    try {
-      await setCOApproval.mutateAsync({ id: co.id, approval });
-      toast.success(`Change Order #${co.co_number} marked ${approval.toLowerCase()}.`);
-      refetchCOs();
-    } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Failed to update approval.");
-    }
-  }
-
-  function confirmSetApproval(co, approval) {
-    requestConfirm(
-      `Mark ${approval}`,
-      `Mark Change Order #${co.co_number} (${co.change_type}) as ${approval}?`,
-      () => handleSetApproval(co, approval)
-    );
-  }
-
-  async function handleToggleBilled(co, billed) {
-    try {
-      await toggleCOBilled.mutateAsync({ id: co.id, billed });
-      refetchCOs();
-    } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Failed to update billed status.");
-    }
-  }
-
-  function confirmToggleBilled(co, billed) {
-    requestConfirm(
-      billed ? "Mark Billed" : "Mark Not Billed",
-      `Mark Change Order #${co.co_number} as ${billed ? "billed" : "not billed"}?`,
-      () => handleToggleBilled(co, billed)
-    );
-  }
-
   function exportChangeOrdersCSV() {
     const headers = ["CO #", "Team", "Change", "Notes", "Date", "Hours", "Approval", "Billed", "Created By"];
     const rows = changeOrders.map((co) => [
@@ -411,7 +376,7 @@ export default function SubmissionOverview({
     return true;
   });
   const filteredChangeOrders =
-    coFilter === "All" ? changeOrders : coFilter === "Billed" ? changeOrders.filter((co) => co.billed) : changeOrders.filter((co) => co.approval === coFilter);
+    coFilter === "All" ? changeOrders : changeOrders.filter((co) => getChangeOrderStatus(co).key === coFilter);
 
   function exportRfisCSV() {
     const headers = ["Type", "Title", "Description", "RFI Date", "Expected Response", "Actual Return", "Status", "Created By"];
@@ -810,18 +775,21 @@ export default function SubmissionOverview({
               {changeOrders.length > 0 && (
                 <div className="rfi-filter-bar">
                   <span className="rfi-filter-label">Filter:</span>
-                  {["All", "Pending", "Approved", "Rejected", "Billed"].map((f) => (
+                  <button
+                    type="button"
+                    className={`rfi-filter-pill${coFilter === "All" ? " active" : ""}`}
+                    onClick={() => setCoFilter("All")}
+                  >
+                    All
+                  </button>
+                  {CHANGE_ORDER_STATUSES.map((s) => (
                     <button
-                      key={f}
+                      key={s.key}
                       type="button"
-                      className={`rfi-filter-pill${coFilter === f ? " active" : ""}`}
-                      onClick={() => setCoFilter(f)}
+                      className={`rfi-filter-pill${coFilter === s.key ? " active" : ""}`}
+                      onClick={() => setCoFilter(s.key)}
                     >
-                      {f === "Pending" && <i className="bi bi-hourglass-split" />}
-                      {f === "Approved" && <i className="bi bi-check-lg" />}
-                      {f === "Rejected" && <i className="bi bi-x-lg" />}
-                      {f === "Billed" && <i className="bi bi-cash-coin" />}
-                      {f}
+                      <i className={`bi ${s.icon}`} /> {s.label}
                     </button>
                   ))}
                 </div>
@@ -837,15 +805,14 @@ export default function SubmissionOverview({
                         canDelete={canDeleteChangeOrders}
                         onEdit={openEditCO}
                         onDelete={setDeleteTargetCO}
-                        onSetApproval={confirmSetApproval}
-                        onToggleBilled={confirmToggleBilled}
+                        showTotal={showCoTotal}
                       />
                     ))}
                   </div>
                 ) : changeOrders.length ? (
                   <div className="empty-state">
                     <i className="bi bi-funnel" />
-                    <div>No {coFilter.toLowerCase()} change orders</div>
+                    <div>No {(CHANGE_ORDER_STATUSES.find((s) => s.key === coFilter)?.label || coFilter).toLowerCase()} change orders</div>
                     <div className="text-muted small">Try a different filter</div>
                   </div>
                 ) : (

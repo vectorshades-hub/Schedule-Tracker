@@ -123,8 +123,8 @@ export default function FinanceDashboardPage() {
         </div>
       </div>
 
-      <div className="table-responsive">
-        <table className="table table-hover align-middle">
+      <div className="table-wrap theme-navyblue">
+        <table className="table table-hover align-middle mb-0">
           <thead>
             <tr>
               <th>Project</th>
@@ -132,14 +132,11 @@ export default function FinanceDashboardPage() {
               <th>CO #</th>
               <th>Date</th>
               <th>Change Type</th>
-              <th>Currency</th>
               <th>Hours</th>
-              <th>Amount</th>
+              <th>Rate</th>
               <th>Total</th>
-              <th>Released By</th>
-              <th>Released At</th>
-              <th>Acknowledged</th>
-              <th></th>
+              <th>Released</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -147,40 +144,24 @@ export default function FinanceDashboardPage() {
               <tr key={co.id}>
                 <td><a href={`/projects/${encodeURIComponent(co.project)}`}>{co.project}</a></td>
                 <td>{co.client || "—"}</td>
-                <td>CO{co.co_number}</td>
-                <td>{co.date || "—"}</td>
+                <td className="fw-semibold">CO{co.co_number}</td>
+                <td className="text-nowrap">{co.date || "—"}</td>
                 <td>{co.change_type || "—"}</td>
-                <td>{co.currency || "USD"}</td>
                 <td>{Number(co.hours ?? 0).toFixed(2)}</td>
-                <td>{Number(co.amount ?? 0).toFixed(2)}</td>
-                <td>{Number(co.total ?? 0).toFixed(2)}</td>
-                <td>{co.released_to_finance_by || "—"}</td>
-                <td>{co.released_to_finance_at ? new Date(co.released_to_finance_at).toLocaleString() : "—"}</td>
+                <td className="text-nowrap">{co.currency || "USD"} {Number(co.amount ?? 0).toFixed(2)}</td>
+                <td className="text-nowrap fw-semibold">{co.currency || "USD"} {Number(co.total ?? 0).toFixed(2)}</td>
                 <td>
-                  {co.finance_acknowledged ? (
-                    <span className="badge bg-success" title={co.finance_acknowledged_by ? `By ${co.finance_acknowledged_by}` : ""}>
-                      Yes
-                    </span>
-                  ) : (
-                    <span className="badge bg-secondary">No</span>
-                  )}
+                  <div className="small fw-semibold">{co.released_to_finance_by || "—"}</div>
+                  <div className="small text-muted text-nowrap">{fmtDateTime(co.released_to_finance_at)}</div>
                 </td>
                 <td>
-                  {!co.finance_acknowledged && (
-                    <button
-                      className="btn btn-sm btn-outline-success"
-                      disabled={acknowledge.isPending}
-                      onClick={() => handleAcknowledge(co)}
-                    >
-                      <i className="bi bi-check2" /> Acknowledge
-                    </button>
-                  )}
+                  <AcknowledgeCell co={co} onAcknowledge={() => handleAcknowledge(co)} acknowledging={acknowledge.isPending} />
                 </td>
               </tr>
             ))}
             {!changeOrders.length && !isFetching && (
               <tr>
-                <td colSpan={13} className="text-center text-muted py-4">
+                <td colSpan={10} className="text-center text-muted py-4">
                   No Change Orders have been released to finance yet.
                 </td>
               </tr>
@@ -212,5 +193,30 @@ export default function FinanceDashboardPage() {
         </nav>
       )}
     </AppLayout>
+  );
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleString(undefined, { month: "short", day: "2-digit", year: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+/** Acknowledged status and the Acknowledge action live in one cell — the
+ * action only ever applies while not yet acknowledged, so a separate
+ * always-visible column for it left most rows blank. */
+function AcknowledgeCell({ co, onAcknowledge, acknowledging }) {
+  if (co.finance_acknowledged) {
+    return (
+      <span className="badge bg-success" title={co.finance_acknowledged_by ? `By ${co.finance_acknowledged_by}` : ""}>
+        <i className="bi bi-check-lg" /> Acknowledged
+      </span>
+    );
+  }
+  return (
+    <button className="btn btn-sm btn-outline-success" disabled={acknowledging} onClick={onAcknowledge}>
+      <i className="bi bi-check2" /> Acknowledge
+    </button>
   );
 }

@@ -172,33 +172,6 @@ export default function CreateChangeOrderModal({ open, onClose, onSubmit, submit
                   value={`${form.currency} ${((Number(form.hours) || 0) * (Number(form.amount) || 0)).toFixed(2)}`}
                 />
               </div>
-              <div className="col-4">
-                <label className="form-label small fw-bold">Approval</label>
-                <select
-                  className="form-select"
-                  value={form.approval}
-                  onChange={(e) => setForm((f) => ({ ...f, approval: e.target.value }))}
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="Approved">Approved</option>
-                  <option value="Rejected">Rejected</option>
-                </select>
-              </div>
-              <div className="col-4">
-                <label className="form-label small fw-bold d-block">Billed</label>
-                <div className="form-check mt-2">
-                  <input
-                    type="checkbox"
-                    className="form-check-input"
-                    id="co-billed-chk"
-                    checked={form.billed}
-                    onChange={(e) => setForm((f) => ({ ...f, billed: e.target.checked }))}
-                  />
-                  <label className="form-check-label small" htmlFor="co-billed-chk">
-                    Mark as Billed
-                  </label>
-                </div>
-              </div>
             </div>
           </div>
           <div className="st-modal-footer">

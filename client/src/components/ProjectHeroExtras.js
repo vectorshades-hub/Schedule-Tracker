@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { api, ApiError } from "../lib/api";
 import { useToast } from "../lib/ToastContext";
+import { getChangeOrderStatus } from "../lib/changeOrderStatus";
 
 function sumHours(rows) {
   return rows.reduce((sum, r) => sum + (r.hours || 0), 0);
@@ -15,8 +16,8 @@ function fmtNum(n) {
  * Sits in the project detail page's PageHero `right` slot: the project's
  * quoted hours (editable by anyone who can edit records — same
  * settingsService.canUpdateRecords flag as canEdit elsewhere) plus each
- * Change Order's hours split by finance acknowledgement — "Completed"
- * (financeAcknowledged, i.e. finance has signed off) vs "Pending" (not yet).
+ * Change Order's hours split by its status (see lib/changeOrderStatus) —
+ * "Completed" once finance has approved it, "Pending" otherwise.
  */
 export default function ProjectHeroExtras({ projectName, canEdit, quotedHours, onQuotedHoursChanged, changeOrders }) {
   const toast = useToast();
@@ -48,8 +49,8 @@ export default function ProjectHeroExtras({ projectName, canEdit, quotedHours, o
     }
   }
 
-  const completedHours = sumHours(changeOrders.filter((c) => c.finance_acknowledged));
-  const pendingHours = sumHours(changeOrders.filter((c) => !c.finance_acknowledged));
+  const completedHours = sumHours(changeOrders.filter((c) => getChangeOrderStatus(c).key === "finance"));
+  const pendingHours = sumHours(changeOrders.filter((c) => getChangeOrderStatus(c).key !== "finance"));
 
   return (
     <div className="hero-extra-row">
@@ -92,7 +93,7 @@ export default function ProjectHeroExtras({ projectName, canEdit, quotedHours, o
       <div className="hero-stat-card co-earnings-card">
         <div className="hero-stat-card-label">
           <span className="hero-stat-icon hero-stat-icon-green"><i className="bi bi-cash-coin" /></span>
-          Change Order Hours
+          Earnings Through CO
         </div>
         <div className="co-earnings-cols">
           <div className="co-earnings-col co-earnings-completed">
