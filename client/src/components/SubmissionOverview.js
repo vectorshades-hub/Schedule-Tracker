@@ -206,6 +206,11 @@ export default function SubmissionOverview({
   const toast = useToast();
   const { user } = useAuth();
   const showCoTotal = user?.role !== "user";
+  // Normal ("user" role) accounts are view-only for Change Orders/RFIs — they
+  // can see and filter/export the lists but never create or edit one,
+  // regardless of the separate can_update_records setting (which only
+  // governs editing Submission Details rows).
+  const canEditCoRfi = canEdit && user?.role !== "user";
   const [coModalOpen, setCoModalOpen] = useState(false);
   const [editingCO, setEditingCO] = useState(null); // the CO row being edited, or null (create mode)
   const [deleteTargetCO, setDeleteTargetCO] = useState(null);
@@ -232,7 +237,7 @@ export default function SubmissionOverview({
   const { data: deletedActivityData } = useProjectActivity(projectName);
   const lifecycle = computeProjectLifecycle(records);
   if (!lifecycle) return null;
-  const { stages, currentIndex, gaps, avgPct } = lifecycle;
+  const { stages, currentIndex, avgPct } = lifecycle;
   // Stage anchors sit inset from the track's edges (not flush at 0%/100%) so
   // each circle+label column has room either side without spilling out of the card.
   const INSET = 10;
@@ -552,12 +557,16 @@ export default function SubmissionOverview({
             </div>
           </div>
           <div className="lifecycle-actions">
-            <button type="button" className="btn btn-sm btn-outline-warning" onClick={openCreateRfi}>
-              <i className="bi bi-file-earmark-text" /> RFI / Clarification
-            </button>
-            <button type="button" className="btn btn-sm btn-outline-success" onClick={openCreateCO}>
-              <i className="bi bi-cash-coin" /> Change Order
-            </button>
+            {canEditCoRfi && (
+              <button type="button" className="btn btn-sm btn-outline-warning" onClick={openCreateRfi}>
+                <i className="bi bi-file-earmark-text" /> RFI / Clarification
+              </button>
+            )}
+            {canEditCoRfi && (
+              <button type="button" className="btn btn-sm btn-outline-success" onClick={openCreateCO}>
+                <i className="bi bi-cash-coin" /> Change Order
+              </button>
+            )}
             {onMarkOfaCompleted && (
               ofaCompleted ? (
                 <span className="badge lifecycle-badge-done">
@@ -615,14 +624,6 @@ export default function SubmissionOverview({
             className="lifecycle-track-fill"
             style={{ left: `${posFor(0)}%`, width: `${posFor(currentIndex - 1) - posFor(0)}%` }}
           />
-          {gaps.map(
-            (g, i) =>
-              g != null && (
-                <span key={i} className="lifecycle-gap-pill" style={{ left: `${(posFor(i) + posFor(i + 1)) / 2}%` }}>
-                  {g}d
-                </span>
-              )
-          )}
           {stages.map((s, i) => {
             const positionState = i + 1 < currentIndex ? "done" : i + 1 === currentIndex ? "current" : "pending";
             // "Project Received" has no signoff of its own — position alone
@@ -766,9 +767,11 @@ export default function SubmissionOverview({
                     >
                       <i className="bi bi-download" /> Export
                     </button>
-                    <button type="button" className="btn btn-sm btn-success" onClick={openCreateCO}>
-                      <i className="bi bi-plus-lg" /> Add CO
-                    </button>
+                    {canEditCoRfi && (
+                      <button type="button" className="btn btn-sm btn-success" onClick={openCreateCO}>
+                        <i className="bi bi-plus-lg" /> Add CO
+                      </button>
+                    )}
                   </>
                 }
               />
@@ -801,7 +804,7 @@ export default function SubmissionOverview({
                       <ChangeOrderCard
                         key={co.id}
                         co={co}
-                        canEdit={canEdit}
+                        canEdit={canEditCoRfi}
                         canDelete={canDeleteChangeOrders}
                         onEdit={openEditCO}
                         onDelete={setDeleteTargetCO}
@@ -819,7 +822,7 @@ export default function SubmissionOverview({
                   <div className="empty-state">
                     <i className="bi bi-cash-stack" />
                     <div>No change orders yet</div>
-                    <div className="text-muted small">Click "+ Add CO" to create one</div>
+                    {canEditCoRfi && <div className="text-muted small">Click "+ Add CO" to create one</div>}
                   </div>
                 )}
               </div>
@@ -842,9 +845,11 @@ export default function SubmissionOverview({
                     >
                       <i className="bi bi-download" /> Export
                     </button>
-                    <button type="button" className="btn btn-sm btn-warning" onClick={openCreateRfi}>
-                      <i className="bi bi-plus-lg" /> Add
-                    </button>
+                    {canEditCoRfi && (
+                      <button type="button" className="btn btn-sm btn-warning" onClick={openCreateRfi}>
+                        <i className="bi bi-plus-lg" /> Add
+                      </button>
+                    )}
                   </>
                 }
               />
@@ -873,7 +878,7 @@ export default function SubmissionOverview({
                       <RfiCard
                         key={rfi.id}
                         rfi={rfi}
-                        canEdit={canEdit}
+                        canEdit={canEditCoRfi}
                         canDelete={canDeleteRfis}
                         onEdit={openEditRfi}
                         onDelete={setDeleteTargetRfi}
@@ -891,7 +896,7 @@ export default function SubmissionOverview({
                   <div className="empty-state">
                     <i className="bi bi-clipboard" />
                     <div>No RFIs yet</div>
-                    <div className="text-muted small">Click "+ Add" to create one</div>
+                    {canEditCoRfi && <div className="text-muted small">Click "+ Add" to create one</div>}
                   </div>
                 )}
               </div>
