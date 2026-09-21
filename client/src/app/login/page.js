@@ -115,7 +115,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="login-footer">Developed by Vectorshades LLC</p>
+        <p className="login-footer">Developed by R &amp; D Department, Vectorshades LLC</p>
       </div>
     </div>
   );
