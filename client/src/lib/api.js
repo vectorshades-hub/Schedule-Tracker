@@ -3,8 +3,8 @@
 // a LAN IP, ...) so the same build works from any device on the network.
 function resolveApiUrl() {
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
-  if (typeof window !== "undefined") return `http://${window.location.hostname}:8420/api`;
-  return "http://localhost:8420/api";
+  if (typeof window !== "undefined") return `http://${window.location.hostname}:8008/api`;
+  return "http://localhost:8008/api";
 }
 
 const API_URL = resolveApiUrl();

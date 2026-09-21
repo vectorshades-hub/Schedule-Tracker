@@ -4,7 +4,7 @@ A full rewrite of the Flask + PostgreSQL "Schedule Tracker" app as **React (Next
 
 ```
 schedule-tracker-mern/
-├── server/     Express API (port 8420) + MongoDB models + migration script
+├── server/     Express API (port 8008) + MongoDB models + migration script
 └── client/     Next.js frontend (port 5005)
 ```
 
@@ -21,7 +21,7 @@ schedule-tracker-mern/
 cd server
 copy .env.example .env
 npm install
-npm run dev          # http://localhost:8420
+npm run dev          # http://localhost:8008
 ```
 
 Edit `.env` if you want to change the MongoDB URI, ports, or any of the feature passwords (defaults match the original Flask app: delete/update/log/request-log passwords are all preserved). The notifications password gate was removed at the user's request — `/notifications` is open to any admin/management user, no password.
