@@ -1,4 +1,13 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8420/api";
+// NEXT_PUBLIC_API_URL, when set, pins the API to a fixed host. Otherwise we
+// derive it from whatever host the browser used to load the page (localhost,
+// a LAN IP, ...) so the same build works from any device on the network.
+function resolveApiUrl() {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== "undefined") return `http://${window.location.hostname}:8420/api`;
+  return "http://localhost:8420/api";
+}
+
+const API_URL = resolveApiUrl();
 // The server's origin (API_URL minus the /api suffix) — for static assets like /static/*.
 const SERVER_ORIGIN = API_URL.replace(/\/api\/?$/, "");
 

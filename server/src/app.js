@@ -31,7 +31,10 @@ app.set("trust proxy", 1);
 
 app.use(
   cors({
-    origin: env.clientOrigin,
+    // Reflects whatever origin the request came from (LAN IP, localhost, ...)
+    // instead of trusting a single fixed CLIENT_ORIGIN — this is an internal
+    // tool accessed from many devices on the local network.
+    origin: true,
     credentials: true,
   })
 );

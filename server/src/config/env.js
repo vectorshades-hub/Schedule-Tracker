@@ -8,7 +8,6 @@ function bool(v, def) {
 module.exports = {
   mongoUri: process.env.MONGO_URI || "mongodb://localhost:27017/schedule_tracker",
   port: parseInt(process.env.PORT || "8420", 10),
-  clientOrigin: process.env.CLIENT_ORIGIN || "http://localhost:5000",
   sessionSecret: process.env.SESSION_SECRET || "dev-secret-change-me",
 
   // Record/Change Order/RFI delete no longer use a shared password — see
