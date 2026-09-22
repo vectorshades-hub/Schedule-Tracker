@@ -6,11 +6,18 @@ import PageHero from "../../components/PageHero";
 import StatPill from "../../components/StatPill";
 import Modal from "../../components/Modal";
 import SearchableDropdown from "../../components/SearchableDropdown";
+import SortableTh from "../../components/SortableTh";
 import { useAuth } from "../../lib/AuthContext";
 import { useManagementDashboardChangeOrders, useSetInvoiceReleased } from "../../hooks/useManagementDashboard";
 import { ApiError } from "../../lib/api";
 import { useToast } from "../../lib/ToastContext";
-import { getChangeOrderStatus } from "../../lib/changeOrderStatus";
+import { CHANGE_ORDER_STATUSES, getChangeOrderStatus } from "../../lib/changeOrderStatus";
+
+// Maps the Status column's labels (Pending/Sent to Finance/Finance Approved)
+// to the `co_status` query param — a separate filter dimension from the
+// Invoice Released pills above.
+const CO_STATUS_OPTIONS = CHANGE_ORDER_STATUSES.map((s) => s.label);
+const CO_STATUS_KEY_BY_LABEL = Object.fromEntries(CHANGE_ORDER_STATUSES.map((s) => [s.label, s.key]));
 
 // "not_set" (not "") is its own token because the api.js fetch wrapper strips
 // any query param whose value is "" — sending status="" would be silently
@@ -49,46 +56,106 @@ export default function ManagementDashboardPage() {
   }, [loading, user]);
 
   const [statusFilter, setStatusFilter] = useState("all");
+  const [coStatusFilter, setCoStatusFilter] = useState(""); // Status column filter (Pending/Sent to Finance/Finance Approved label, or "" for all
   const [projectFilter, setProjectFilter] = useState("");
+  const [clientFilter, setClientFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [editTarget, setEditTarget] = useState(null); // the CO row being edited
+  const [saveWarning, setSaveWarning] = useState(null); // { message, incomplete: [{id,name}] } — set when the server blocks "Yes" over incomplete linked submissions
+  const [sortBy, setSortBy] = useState(null);
+  const [sortDir, setSortDir] = useState("asc");
 
   const { data, isFetching } = useManagementDashboardChangeOrders({
     page,
     status: statusFilter === "all" ? undefined : statusFilter,
+    co_status: coStatusFilter ? CO_STATUS_KEY_BY_LABEL[coStatusFilter] : undefined,
     project: projectFilter || undefined,
+    client: clientFilter || undefined,
+    date_from: dateFrom || undefined,
+    date_to: dateTo || undefined,
     search: search || undefined,
+    sort_by: sortBy || undefined,
+    sort_dir: sortDir,
   });
   const setInvoiceReleased = useSetInvoiceReleased();
 
   const changeOrders = data?.change_orders || [];
   const projectOptions = data?.projects || [];
+  const clientOptions = data?.clients || [];
   const summary = data?.summary || { total: 0, released_yes: 0, released_no: 0, not_set: 0 };
 
   function selectStatus(key) {
     setStatusFilter(key);
     setPage(1);
   }
+  function selectCoStatus(label) {
+    setCoStatusFilter(label);
+    setPage(1);
+  }
   function selectProject(name) {
     setProjectFilter(name);
+    setPage(1);
+  }
+  function selectClient(name) {
+    setClientFilter(name);
     setPage(1);
   }
   function updateSearch(value) {
     setSearch(value);
     setPage(1);
   }
+  function updateDateRange({ from, to }) {
+    setDateFrom(from);
+    setDateTo(to);
+    setPage(1);
+  }
+  const hasActiveFilters = !!coStatusFilter || !!projectFilter || !!clientFilter || !!search || !!dateFrom || !!dateTo;
+  function clearFilters() {
+    setCoStatusFilter("");
+    setProjectFilter("");
+    setClientFilter("");
+    setDateFrom("");
+    setDateTo("");
+    setSearch("");
+    setPage(1);
+  }
+  function handleSort(field) {
+    if (sortBy === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDir("asc");
+    }
+    setPage(1);
+  }
 
   async function handleSave(id, invoiceReleased, reason) {
     const wasReleasedToFinance = !!editTarget?.released_to_finance;
+    setSaveWarning(null);
     try {
       const res = await setInvoiceReleased.mutateAsync({ id, invoiceReleased, reason });
       setEditTarget(null);
       const autoReleased = invoiceReleased === "Yes" && !wasReleasedToFinance && res?.change_order?.released_to_finance;
       toast.success(autoReleased ? "Invoice Released updated — CO auto-released to Finance." : "Invoice Released updated.");
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Failed to update Invoice Released.");
+      if (e instanceof ApiError && e.data?.incomplete_submissions) {
+        setSaveWarning({ message: e.message, incomplete: e.data.incomplete_submissions });
+      } else {
+        toast.error(e instanceof ApiError ? e.message : "Failed to update Invoice Released.");
+      }
     }
+  }
+
+  function openInvoiceReleasedModal(co) {
+    setSaveWarning(null);
+    setEditTarget(co);
+  }
+  function closeInvoiceReleasedModal() {
+    setSaveWarning(null);
+    setEditTarget(null);
   }
 
   if (loading || !user || !canSeeDashboard) {
@@ -121,31 +188,74 @@ export default function ManagementDashboardPage() {
         ))}
       </div>
 
-      <div className="row g-2 mb-3">
-        <div className="col-md-4">
+      <div className="row g-2 mb-2">
+        <div className="col-md-3">
           <label className="form-label small mb-1">Project</label>
           <SearchableDropdown value={projectFilter} onChange={selectProject} options={projectOptions} placeholder="All projects" />
         </div>
-        <div className="col-md-4">
-          <label className="form-label small mb-1">Search (CO # or Project)</label>
-          <input className="form-control" value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="e.g. 001 or Acme Tower" />
+        <div className="col-md-3">
+          <label className="form-label small mb-1">Client</label>
+          <SearchableDropdown value={clientFilter} onChange={selectClient} options={clientOptions} placeholder="All clients" />
         </div>
+        <div className="col-md-3">
+          <label className="form-label small mb-1">Status</label>
+          <SearchableDropdown value={coStatusFilter} onChange={selectCoStatus} options={CO_STATUS_OPTIONS} placeholder="All statuses" />
+        </div>
+        <div className="col-md-3">
+          <label className="form-label small mb-1">Search (CO #, Project, or Change Type)</label>
+          <input className="form-control" value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="e.g. 001, Acme Tower, or Scope Addition" />
+        </div>
+      </div>
+
+      <div className="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+        <div>
+          <label className="form-label small mb-1">Date</label>
+          <div className={`date-range-inline${dateFrom || dateTo ? " active" : ""}`}>
+            <i className="bi bi-calendar3 date-range-icon" />
+            <input
+              type="date"
+              className="date-range-input"
+              value={dateFrom}
+              onChange={(e) => updateDateRange({ from: e.target.value, to: dateTo })}
+              aria-label="From date"
+            />
+            <i className="bi bi-arrow-right date-range-sep" />
+            <i className="bi bi-calendar3 date-range-icon" />
+            <input
+              type="date"
+              className="date-range-input"
+              value={dateTo}
+              onChange={(e) => updateDateRange({ from: dateFrom, to: e.target.value })}
+              aria-label="To date"
+            />
+            {(dateFrom || dateTo) && (
+              <button type="button" className="date-range-clear" onClick={() => updateDateRange({ from: "", to: "" })} aria-label="Clear date range">
+                <i className="bi bi-x-lg" />
+              </button>
+            )}
+          </div>
+        </div>
+        {hasActiveFilters && (
+          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearFilters}>
+            <i className="bi bi-x-circle" /> Clear
+          </button>
+        )}
       </div>
 
       <div className="table-wrap theme-navyblue">
         <table className="table table-hover align-middle mb-0">
           <thead>
             <tr>
-              <th>Project</th>
-              <th>Client</th>
-              <th>CO #</th>
-              <th>Date</th>
-              <th>Change Type</th>
-              <th>Hours</th>
-              <th>Rate</th>
-              <th>Total</th>
-              <th>Status</th>
-              <th>Invoice Released</th>
+              <SortableTh field="project" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Project</SortableTh>
+              <SortableTh field="client" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Client</SortableTh>
+              <SortableTh field="co_number" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>CO #</SortableTh>
+              <SortableTh field="date" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Date</SortableTh>
+              <SortableTh field="change_type" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Change Type</SortableTh>
+              <SortableTh field="hours" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Hours</SortableTh>
+              <SortableTh field="amount" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Rate</SortableTh>
+              <SortableTh field="total" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Total</SortableTh>
+              <SortableTh field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Status</SortableTh>
+              <SortableTh field="invoice_released" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Invoice Released</SortableTh>
               <th></th>
             </tr>
           </thead>
@@ -168,7 +278,7 @@ export default function ManagementDashboardPage() {
                 </td>
                 <td>
                   {canEdit && (
-                    <button className="btn btn-sm btn-outline-primary" onClick={() => setEditTarget(co)}>
+                    <button className="btn btn-sm btn-outline-primary" onClick={() => openInvoiceReleasedModal(co)}>
                       <i className="bi bi-pencil" /> Update
                     </button>
                   )}
@@ -209,7 +319,13 @@ export default function ManagementDashboardPage() {
         </nav>
       )}
 
-      <InvoiceReleasedModal co={editTarget} onClose={() => setEditTarget(null)} onSave={handleSave} saving={setInvoiceReleased.isPending} />
+      <InvoiceReleasedModal
+        co={editTarget}
+        onClose={closeInvoiceReleasedModal}
+        onSave={handleSave}
+        saving={setInvoiceReleased.isPending}
+        warning={saveWarning}
+      />
     </AppLayout>
   );
 }
@@ -241,8 +357,12 @@ function InvoiceReleasedBadge({ value, reason }) {
 }
 
 /** Edit modal — a plain toggle can't capture the required reason, so setting
- * Invoice Released to "No" always goes through this form instead. */
-function InvoiceReleasedModal({ co, onClose, onSave, saving }) {
+ * Invoice Released to "No" always goes through this form instead. Setting it
+ * to "Yes" is blocked server-side while any submission the CO is tied to
+ * (its auto-add source, plus whatever's manually linked) isn't yet
+ * Completed — `warning` surfaces that rejection inline instead of a toast
+ * alone, since it names specific submissions the user needs to go check. */
+function InvoiceReleasedModal({ co, onClose, onSave, saving, warning }) {
   const [value, setValue] = useState("");
   const [reason, setReason] = useState("");
 
@@ -275,6 +395,25 @@ function InvoiceReleasedModal({ co, onClose, onSave, saving }) {
         </>
       }
     >
+      {warning && (
+        <div className="alert alert-warning d-flex gap-2 mb-3" role="alert">
+          <i className="bi bi-exclamation-triangle-fill mt-1" />
+          <div>
+            <div className="fw-semibold">{warning.message}</div>
+            {warning.incomplete?.length > 0 && (
+              <ul className="mb-0 mt-1 ps-3 small">
+                {warning.incomplete.map((s) => (
+                  <li key={s.id}>
+                    #{s.id}
+                    {s.name ? ` — ${s.name}` : ""}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
       <label className="form-label">Invoice Released</label>
       <div className="d-flex gap-3 mb-3">
         {[

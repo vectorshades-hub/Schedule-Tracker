@@ -33,6 +33,13 @@ const changeOrderSchema = new mongoose.Schema({
   // toggling Billable off and back on, or re-saving an already-billable
   // submission, checks this before adding a second CO for the same submission.
   sourceRecordId: { type: Number, default: null, index: true },
+  // Manually-linked submissions (Record.legacyId values), picked on the
+  // create/edit form — separate from `sourceRecordId` above (the single
+  // auto-add source, never touched by the create/edit routes). A CO can
+  // reference several submissions at once; this is what drives the linked-
+  // submissions list (with each one's percentage/status/due date) shown in
+  // the edit form.
+  linkedSubmissionIds: { type: [Number], default: [] },
   // Management Dashboard's Invoice Released field — "" | "Yes" | "No", same
   // convention as Record.invoiceReleased, gated by the same
   // settingsService.canEditInvoiceReleased permission. `invoiceReleasedReason`

@@ -289,6 +289,7 @@ export default function SubmissionOverview({
       change_type: form.change_type,
       notes: form.notes,
       hours: form.hours,
+      linked_submission_ids: form.linked_submission_ids || [],
       approval: form.approval,
       billed: form.billed,
       currency: form.currency,
@@ -428,6 +429,7 @@ export default function SubmissionOverview({
       date: form.date,
       expected_response_date: form.expected_response_date,
       actual_return_date: form.actual_return_date,
+      linked_submission_ids: form.linked_submission_ids || [],
     };
     try {
       const res = editingRfi
@@ -809,6 +811,7 @@ export default function SubmissionOverview({
                         onEdit={openEditCO}
                         onDelete={setDeleteTargetCO}
                         showTotal={showCoTotal}
+                        submissionOptions={records}
                       />
                     ))}
                   </div>
@@ -883,6 +886,7 @@ export default function SubmissionOverview({
                         onEdit={openEditRfi}
                         onDelete={setDeleteTargetRfi}
                         onSetResponseReceived={confirmSetRfiResponse}
+                        submissionOptions={records}
                       />
                     ))}
                   </div>
@@ -1075,6 +1079,7 @@ export default function SubmissionOverview({
         initial={editingCO}
         teamOptions={coDashboardConfig?.selectableTeams || []}
         defaultTeam={coDashboardConfig?.defaultTeam || ""}
+        submissionOptions={records}
       />
 
       {deleteTargetCO && (
@@ -1105,6 +1110,7 @@ export default function SubmissionOverview({
         onSubmit={submitRfi}
         submitting={editingRfi ? updateRfi.isPending : createRfi.isPending}
         initial={editingRfi}
+        submissionOptions={records}
       />
 
       {deleteTargetRfi && (

@@ -1,5 +1,6 @@
 "use client";
 import { getChangeOrderStatus } from "../lib/changeOrderStatus";
+import StatusBadge from "./StatusBadge";
 
 function fmtDateLong(iso) {
   if (!iso) return "";
@@ -8,10 +9,14 @@ function fmtDateLong(iso) {
   return d.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-/** One Change Order card — CO#/type/status/edit/delete on top, notes,
- * date/hours summary chips, then created-by along the bottom. */
-export default function ChangeOrderCard({ co, canEdit, canDelete, onEdit, onDelete, showTotal = true }) {
+/** One Change Order card — CO#/type on top, then status (left) / edit+delete
+ * (right) on their own row, notes, linked-submissions chips, date/hours
+ * summary chips, then created-by along the bottom. */
+export default function ChangeOrderCard({ co, canEdit, canDelete, onEdit, onDelete, showTotal = true, submissionOptions = [] }) {
   const status = getChangeOrderStatus(co);
+  const linkedSubmissions = (co.linked_submission_ids || []).map(
+    (id) => submissionOptions.find((s) => String(s.id) === String(id)) || { id, submission_name: "" }
+  );
   return (
     <div className="co-card">
       <div className="co-card-top">
@@ -19,10 +24,13 @@ export default function ChangeOrderCard({ co, canEdit, canDelete, onEdit, onDele
           <span className="co-number-pill">CO{co.co_number}</span>
           <span className="co-change-type">{co.change_type}</span>
         </div>
+      </div>
+
+      <div className="co-card-status-row">
+        <span className={`co-status-pill co-status-${status.key}`}>
+          <i className={`bi ${status.icon}`} /> {status.label.toUpperCase()}
+        </span>
         <div className="co-card-actions">
-          <span className={`co-status-pill co-status-${status.key}`}>
-            <i className={`bi ${status.icon}`} /> {status.label.toUpperCase()}
-          </span>
           {canEdit && (
             <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onEdit(co)}>
               <i className="bi bi-pencil" /> Edit
@@ -37,6 +45,30 @@ export default function ChangeOrderCard({ co, canEdit, canDelete, onEdit, onDele
       </div>
 
       {co.notes && <div className="co-notes">{co.notes}</div>}
+
+      {linkedSubmissions.length > 0 && (
+        <div className="co-linked-section">
+          <div className="co-linked-section-label">
+            <i className="bi bi-link-45deg" /> Linked Submissions ({linkedSubmissions.length})
+          </div>
+          <div className="co-linked-submissions">
+            {linkedSubmissions.map((s) => (
+              <div className="co-linked-row" key={s.id}>
+                <div className="co-linked-row-icon">
+                  <i className="bi bi-link-45deg" />
+                </div>
+                <span className="co-linked-row-name" title={s.submission_name || "Unknown submission"}>
+                  <span className="co-linked-row-id">#{s.id}</span> {s.submission_name || "Unknown submission"}
+                </span>
+                <div className="co-linked-row-meta">
+                  {s.status ? <StatusBadge status={s.status} tag={s.tag} /> : null}
+                  {s.percentage != null && <span className="submission-row-pct">{s.percentage}%</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="co-chip-row">
         {co.team && (

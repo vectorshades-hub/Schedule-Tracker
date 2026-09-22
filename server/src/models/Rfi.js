@@ -17,6 +17,10 @@ const rfiSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   updatedBy: { type: String, default: "" },
   updatedAt: { type: Date, default: null },
+  // Submissions (Record.legacyId values) this RFI covers — an RFI can apply
+  // to several submissions at once, picked on the create/edit form. Same
+  // convention as ChangeOrder.linkedSubmissionIds.
+  linkedSubmissionIds: { type: [Number], default: [] },
 });
 
 module.exports = mongoose.model("Rfi", rfiSchema);

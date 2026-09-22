@@ -20,6 +20,11 @@ function computeRfiStatus(rfi) {
   return "Pending";
 }
 
+function parseLinkedSubmissionIds(raw) {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.map((v) => Number(v)).filter((n) => Number.isFinite(n)))];
+}
+
 function toRow(rfi) {
   return {
     id: String(rfi._id),
@@ -30,6 +35,7 @@ function toRow(rfi) {
     date: rfi.date ? statusEngine.fmtDateOnlyISO(rfi.date) : "",
     expected_response_date: rfi.expectedResponseDate ? statusEngine.fmtDateOnlyISO(rfi.expectedResponseDate) : "",
     actual_return_date: rfi.actualReturnDate ? statusEngine.fmtDateOnlyISO(rfi.actualReturnDate) : "",
+    linked_submission_ids: rfi.linkedSubmissionIds || [],
     status: computeRfiStatus(rfi),
     created_by: rfi.createdBy || "",
     created_at: rfi.createdAt ? new Date(rfi.createdAt).toISOString() : "",
@@ -70,6 +76,7 @@ router.post("/", requireRole("admin", "management"), async (req, res) => {
       date: statusEngine.parseDate(dateRaw),
       expectedResponseDate: statusEngine.parseDate(expectedRaw),
       actualReturnDate: actualRaw ? statusEngine.parseDate(actualRaw) : null,
+      linkedSubmissionIds: parseLinkedSubmissionIds(b.linked_submission_ids),
       createdBy: user,
       createdAt: new Date(),
     });
@@ -107,6 +114,7 @@ router.put("/:id", requireRole("admin", "management"), async (req, res) => {
         date: statusEngine.parseDate(dateRaw),
         expectedResponseDate: statusEngine.parseDate(expectedRaw),
         actualReturnDate: actualRaw ? statusEngine.parseDate(actualRaw) : null,
+        linkedSubmissionIds: parseLinkedSubmissionIds(b.linked_submission_ids),
         updatedBy: user,
         updatedAt: new Date(),
       },

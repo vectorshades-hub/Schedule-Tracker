@@ -57,6 +57,11 @@ async function filterChangeOrdersForViewer(rows, username, role) {
   });
 }
 
+function parseLinkedSubmissionIds(raw) {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.map((v) => Number(v)).filter((n) => Number.isFinite(n)))];
+}
+
 function toRow(co) {
   return {
     id: String(co._id),
@@ -67,6 +72,7 @@ function toRow(co) {
     change_type: co.changeType || "",
     notes: co.notes || "",
     hours: co.hours ?? 0,
+    linked_submission_ids: co.linkedSubmissionIds || [],
     approval: co.approval || "Pending",
     billed: !!co.billed,
     invoice_released: co.invoiceReleased || "",
@@ -126,6 +132,7 @@ router.post("/", requireRole("admin", "management"), async (req, res) => {
       changeType,
       notes: String(b.notes || "").trim(),
       hours: hoursVal,
+      linkedSubmissionIds: parseLinkedSubmissionIds(b.linked_submission_ids),
       approval: ["Pending", "Approved", "Rejected"].includes(b.approval) ? b.approval : "Pending",
       billed: !!b.billed,
       currency: String(b.currency || "USD").trim() || "USD",
@@ -171,6 +178,7 @@ router.put("/:id", requireRole("admin", "management"), async (req, res) => {
         changeType,
         notes: String(b.notes || "").trim(),
         hours: hoursVal,
+        linkedSubmissionIds: parseLinkedSubmissionIds(b.linked_submission_ids),
         approval: ["Pending", "Approved", "Rejected"].includes(b.approval) ? b.approval : "Pending",
         billed: !!b.billed,
         currency: String(b.currency || "USD").trim() || "USD",
@@ -252,6 +260,26 @@ router.post("/:id/billed", requireRole("admin", "management"), async (req, res) 
 });
 
 /**
+ * The submissions a CO is tied to — its auto-add source (sourceRecordId) plus
+ * whatever was manually linked (linkedSubmissionIds) — that aren't yet
+ * Completed (same "completed"/"completed_overdue" tag statusEngine.computeStatus
+ * gives the submissions list). Empty when the CO has no related submissions
+ * at all, since there's nothing to block on.
+ */
+async function getIncompleteLinkedSubmissions(co) {
+  const ids = new Set(co.linkedSubmissionIds || []);
+  if (co.sourceRecordId != null) ids.add(co.sourceRecordId);
+  if (!ids.size) return [];
+
+  const records = await Record.find({ legacyId: { $in: [...ids] } })
+    .select("legacyId submissionName status dueDate")
+    .lean();
+  return records
+    .filter((r) => !statusEngine.computeStatus(r.dueDate, r.status).tag.startsWith("completed"))
+    .map((r) => ({ id: r.legacyId, name: r.submissionName || "" }));
+}
+
+/**
  * POST /api/change-orders/:id/invoice-released — set "" | "Yes" | "No", with
  * a required reason whenever the value is "No" (surfaced on the Management
  * Dashboard's Yes/No lists). Permission-gated the same way as Record's
@@ -263,6 +291,8 @@ router.post("/:id/billed", requireRole("admin", "management"), async (req, res) 
  * been already) — an invoice can't really be released before finance has
  * it, so the two workflows would otherwise drift out of sync waiting on a
  * separate manual "Release" click for something that's already happened.
+ * That auto-release (and the Yes itself) is blocked while any submission the
+ * CO is tied to isn't yet Completed — see getIncompleteLinkedSubmissions.
  */
 router.post("/:id/invoice-released", requireAuth, async (req, res) => {
   const allowed = await canEditInvoiceReleased(req.session.userId, req.session.role);
@@ -280,6 +310,17 @@ router.post("/:id/invoice-released", requireAuth, async (req, res) => {
   try {
     const existing = await ChangeOrder.findById(req.params.id);
     if (!existing) return res.status(404).json({ ok: false, error: "Change order not found." });
+
+    if (value === "Yes") {
+      const incomplete = await getIncompleteLinkedSubmissions(existing);
+      if (incomplete.length) {
+        return res.status(400).json({
+          ok: false,
+          error: `Invoice can't be released — ${incomplete.length} linked submission${incomplete.length > 1 ? "s are" : " is"} not completed yet.`,
+          incomplete_submissions: incomplete,
+        });
+      }
+    }
 
     const update = {
       invoiceReleased: value,

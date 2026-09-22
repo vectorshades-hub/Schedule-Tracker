@@ -5,6 +5,7 @@ import AppLayout from "../../components/AppLayout";
 import PageHero from "../../components/PageHero";
 import StatPill from "../../components/StatPill";
 import SearchableDropdown from "../../components/SearchableDropdown";
+import SortableTh from "../../components/SortableTh";
 import { useAuth } from "../../lib/AuthContext";
 import { useFinanceDashboardChangeOrders, useAcknowledgeFinance } from "../../hooks/useFinanceDashboard";
 import { ApiError } from "../../lib/api";
@@ -18,6 +19,13 @@ const STATUS_FILTERS = [
   { key: "acknowledged", label: "Acknowledged", color: "#198754" },
   { key: "not_acknowledged", label: "Not Acknowledged", color: "#6c757d" },
 ];
+
+// The Status dropdown below mirrors the pills above (same statusFilter
+// state, just a second way to pick it) — excludes "all", since that's what
+// an empty/cleared dropdown value already means.
+const STATUS_DROPDOWN_OPTIONS = STATUS_FILTERS.filter((f) => f.key !== "all").map((f) => f.label);
+const STATUS_LABEL_BY_KEY = Object.fromEntries(STATUS_FILTERS.map((f) => [f.key, f.label]));
+const STATUS_KEY_BY_LABEL = Object.fromEntries(STATUS_FILTERS.map((f) => [f.label, f.key]));
 
 /**
  * Finance Dashboard — every Change Order the Management Dashboard has
@@ -45,31 +53,73 @@ export default function FinanceDashboardPage() {
 
   const [statusFilter, setStatusFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("");
+  const [clientFilter, setClientFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState(null);
+  const [sortDir, setSortDir] = useState("asc");
 
   const { data, isFetching } = useFinanceDashboardChangeOrders({
     page,
     status: statusFilter === "all" ? undefined : statusFilter,
     project: projectFilter || undefined,
+    client: clientFilter || undefined,
+    date_from: dateFrom || undefined,
+    date_to: dateTo || undefined,
     search: search || undefined,
+    sort_by: sortBy || undefined,
+    sort_dir: sortDir,
   });
   const acknowledge = useAcknowledgeFinance();
 
   const changeOrders = data?.change_orders || [];
   const projectOptions = data?.projects || [];
+  const clientOptions = data?.clients || [];
   const summary = data?.summary || { total: 0, acknowledged: 0, not_acknowledged: 0 };
 
   function selectStatus(key) {
     setStatusFilter(key);
     setPage(1);
   }
+  function selectStatusFromDropdown(label) {
+    selectStatus(label ? STATUS_KEY_BY_LABEL[label] || "all" : "all");
+  }
   function selectProject(name) {
     setProjectFilter(name);
     setPage(1);
   }
+  function selectClient(name) {
+    setClientFilter(name);
+    setPage(1);
+  }
   function updateSearch(value) {
     setSearch(value);
+    setPage(1);
+  }
+  function updateDateRange({ from, to }) {
+    setDateFrom(from);
+    setDateTo(to);
+    setPage(1);
+  }
+  const hasActiveFilters = statusFilter !== "all" || !!projectFilter || !!clientFilter || !!search || !!dateFrom || !!dateTo;
+  function clearFilters() {
+    setStatusFilter("all");
+    setProjectFilter("");
+    setClientFilter("");
+    setDateFrom("");
+    setDateTo("");
+    setSearch("");
+    setPage(1);
+  }
+  function handleSort(field) {
+    if (sortBy === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDir("asc");
+    }
     setPage(1);
   }
 
@@ -112,31 +162,79 @@ export default function FinanceDashboardPage() {
         ))}
       </div>
 
-      <div className="row g-2 mb-3">
-        <div className="col-md-4">
+      <div className="row g-2 mb-2">
+        <div className="col-md-3">
           <label className="form-label small mb-1">Project</label>
           <SearchableDropdown value={projectFilter} onChange={selectProject} options={projectOptions} placeholder="All projects" />
         </div>
-        <div className="col-md-4">
-          <label className="form-label small mb-1">Search (CO # or Project)</label>
-          <input className="form-control" value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="e.g. 001 or Acme Tower" />
+        <div className="col-md-3">
+          <label className="form-label small mb-1">Client</label>
+          <SearchableDropdown value={clientFilter} onChange={selectClient} options={clientOptions} placeholder="All clients" />
         </div>
+        <div className="col-md-3">
+          <label className="form-label small mb-1">Status</label>
+          <SearchableDropdown
+            value={statusFilter === "all" ? "" : STATUS_LABEL_BY_KEY[statusFilter] || ""}
+            onChange={selectStatusFromDropdown}
+            options={STATUS_DROPDOWN_OPTIONS}
+            placeholder="All statuses"
+          />
+        </div>
+        <div className="col-md-3">
+          <label className="form-label small mb-1">Search (CO #, Project, or Change Type)</label>
+          <input className="form-control" value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="e.g. 001, Acme Tower, or Scope Addition" />
+        </div>
+      </div>
+
+      <div className="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+        <div>
+          <label className="form-label small mb-1">Date</label>
+          <div className={`date-range-inline${dateFrom || dateTo ? " active" : ""}`}>
+            <i className="bi bi-calendar3 date-range-icon" />
+            <input
+              type="date"
+              className="date-range-input"
+              value={dateFrom}
+              onChange={(e) => updateDateRange({ from: e.target.value, to: dateTo })}
+              aria-label="From date"
+            />
+            <i className="bi bi-arrow-right date-range-sep" />
+            <i className="bi bi-calendar3 date-range-icon" />
+            <input
+              type="date"
+              className="date-range-input"
+              value={dateTo}
+              onChange={(e) => updateDateRange({ from: dateFrom, to: e.target.value })}
+              aria-label="To date"
+            />
+            {(dateFrom || dateTo) && (
+              <button type="button" className="date-range-clear" onClick={() => updateDateRange({ from: "", to: "" })} aria-label="Clear date range">
+                <i className="bi bi-x-lg" />
+              </button>
+            )}
+          </div>
+        </div>
+        {hasActiveFilters && (
+          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearFilters}>
+            <i className="bi bi-x-circle" /> Clear
+          </button>
+        )}
       </div>
 
       <div className="table-wrap theme-navyblue">
         <table className="table table-hover align-middle mb-0">
           <thead>
             <tr>
-              <th>Project</th>
-              <th>Client</th>
-              <th>CO #</th>
-              <th>Date</th>
-              <th>Change Type</th>
-              <th>Hours</th>
-              <th>Rate</th>
-              <th>Total</th>
-              <th>Released</th>
-              <th>Status</th>
+              <SortableTh field="project" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Project</SortableTh>
+              <SortableTh field="client" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Client</SortableTh>
+              <SortableTh field="co_number" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>CO #</SortableTh>
+              <SortableTh field="date" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Date</SortableTh>
+              <SortableTh field="change_type" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Change Type</SortableTh>
+              <SortableTh field="hours" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Hours</SortableTh>
+              <SortableTh field="amount" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Rate</SortableTh>
+              <SortableTh field="total" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Total</SortableTh>
+              <SortableTh field="released_to_finance_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Released</SortableTh>
+              <SortableTh field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort}>Status</SortableTh>
             </tr>
           </thead>
           <tbody>

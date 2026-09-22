@@ -1,4 +1,5 @@
 "use client";
+import StatusBadge from "./StatusBadge";
 
 const STATUS_ICON = {
   Pending: "bi-hourglass-split",
@@ -13,12 +14,16 @@ function fmtDateLong(iso) {
   return d.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-/** One RFI/Clarification card — type/title/status/edit/delete on top,
- * description, date chips, then created-by + a reversible "Response
- * Received" toggle (unlike Change Order's one-shot Approve/Reject, this can
- * be flipped back off — see rfis.js's POST /:id/response). */
-export default function RfiCard({ rfi, canEdit, canDelete, onEdit, onDelete, onSetResponseReceived }) {
+/** One RFI/Clarification card — type/title on top, then status (left) /
+ * edit+delete (right) on their own row, description, linked-submissions
+ * chips, date chips, then created-by + a reversible "Response Received"
+ * toggle (unlike Change Order's one-shot Approve/Reject, this can be
+ * flipped back off — see rfis.js's POST /:id/response). */
+export default function RfiCard({ rfi, canEdit, canDelete, onEdit, onDelete, onSetResponseReceived, submissionOptions = [] }) {
   const received = rfi.status === "Returned";
+  const linkedSubmissions = (rfi.linked_submission_ids || []).map(
+    (id) => submissionOptions.find((s) => String(s.id) === String(id)) || { id, submission_name: "" }
+  );
   return (
     <div className="co-card rfi-card">
       <div className="co-card-top">
@@ -26,10 +31,13 @@ export default function RfiCard({ rfi, canEdit, canDelete, onEdit, onDelete, onS
           <span className="rfi-type-pill">{rfi.type}</span>
           <span className="co-change-type">{rfi.title}</span>
         </div>
+      </div>
+
+      <div className="co-card-status-row">
+        <span className={`co-status-pill rfi-status-${rfi.status.toLowerCase()}`}>
+          <i className={`bi ${STATUS_ICON[rfi.status] || "bi-hourglass-split"}`} /> {rfi.status.toUpperCase()}
+        </span>
         <div className="co-card-actions">
-          <span className={`co-status-pill rfi-status-${rfi.status.toLowerCase()}`}>
-            <i className={`bi ${STATUS_ICON[rfi.status] || "bi-hourglass-split"}`} /> {rfi.status.toUpperCase()}
-          </span>
           {canEdit && (
             <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onEdit(rfi)}>
               <i className="bi bi-pencil" /> Edit
@@ -44,6 +52,30 @@ export default function RfiCard({ rfi, canEdit, canDelete, onEdit, onDelete, onS
       </div>
 
       {rfi.description && <div className="co-notes">{rfi.description}</div>}
+
+      {linkedSubmissions.length > 0 && (
+        <div className="co-linked-section">
+          <div className="co-linked-section-label">
+            <i className="bi bi-link-45deg" /> Linked Submissions ({linkedSubmissions.length})
+          </div>
+          <div className="co-linked-submissions">
+            {linkedSubmissions.map((s) => (
+              <div className="co-linked-row" key={s.id}>
+                <div className="co-linked-row-icon">
+                  <i className="bi bi-link-45deg" />
+                </div>
+                <span className="co-linked-row-name" title={s.submission_name || "Unknown submission"}>
+                  <span className="co-linked-row-id">#{s.id}</span> {s.submission_name || "Unknown submission"}
+                </span>
+                <div className="co-linked-row-meta">
+                  {s.status ? <StatusBadge status={s.status} tag={s.tag} /> : null}
+                  {s.percentage != null && <span className="submission-row-pct">{s.percentage}%</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="co-chip-row">
         <span className="co-chip">
