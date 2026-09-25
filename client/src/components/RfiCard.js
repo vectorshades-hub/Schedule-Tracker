@@ -1,5 +1,4 @@
 "use client";
-import StatusBadge from "./StatusBadge";
 
 const STATUS_ICON = {
   Pending: "bi-hourglass-split",
@@ -7,114 +6,75 @@ const STATUS_ICON = {
   Returned: "bi-check-circle-fill",
 };
 
-function fmtDateLong(iso) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" });
+function rfiProgressPct(rfi) {
+  const questions = rfi.questions || [];
+  if (!questions.length) return 0;
+  const received = questions.filter((q) => q.response_received_date).length;
+  return Math.round((received / questions.length) * 100);
 }
 
-/** One RFI/Clarification card — type/title on top, then status (left) /
- * edit+delete (right) on their own row, description, linked-submissions
- * chips, date chips, then created-by + a reversible "Response Received"
- * toggle (unlike Change Order's one-shot Approve/Reject, this can be
- * flipped back off — see rfis.js's POST /:id/response). */
-export default function RfiCard({ rfi, canEdit, canDelete, onEdit, onDelete, onSetResponseReceived, submissionOptions = [] }) {
-  const received = rfi.status === "Returned";
-  const linkedSubmissions = (rfi.linked_submission_ids || []).map(
-    (id) => submissionOptions.find((s) => String(s.id) === String(id)) || { id, submission_name: "" }
-  );
+/** One RFI/Clarification row — compact and scannable (Type, Title, Status,
+ * Progress %) so a whole project's RFI list reads at a glance. Click
+ * anywhere on the row (outside Edit/Delete) to call `onView`, which opens
+ * RfiDetailsModal — that modal is rendered by the parent (SubmissionOverview),
+ * not here, because it must sit outside .detail-panel (see the comment next
+ * to its JSX for why nesting it inside this row's panel breaks position:fixed). */
+export default function RfiCard({ rfi, canEdit, canDelete, onEdit, onDelete, onView, submissionOptions = [] }) {
+  const pct = rfiProgressPct(rfi);
+  const statusKey = rfi.status.toLowerCase();
+
+  function handleRowKeyDown(e) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onView(rfi);
+    }
+  }
+
   return (
-    <div className="co-card rfi-card">
-      <div className="co-card-top">
-        <div className="co-card-left">
+    <div
+      className={`rfi-row rfi-row-${statusKey}`}
+      role="button"
+      tabIndex={0}
+      onClick={() => onView(rfi)}
+      onKeyDown={handleRowKeyDown}
+    >
+      <div className="rfi-row-content">
+        <div className="rfi-row-top">
           <span className="rfi-type-pill">{rfi.type}</span>
-          <span className="co-change-type">{rfi.title}</span>
+          <span className="rfi-row-title">{rfi.title}</span>
         </div>
-      </div>
 
-      <div className="co-card-status-row">
-        <span className={`co-status-pill rfi-status-${rfi.status.toLowerCase()}`}>
-          <i className={`bi ${STATUS_ICON[rfi.status] || "bi-hourglass-split"}`} /> {rfi.status.toUpperCase()}
-        </span>
-        <div className="co-card-actions">
-          {canEdit && (
-            <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onEdit(rfi)}>
-              <i className="bi bi-pencil" /> Edit
-            </button>
-          )}
-          {canDelete && (
-            <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => onDelete(rfi)}>
-              <i className="bi bi-trash" /> Delete
-            </button>
-          )}
-        </div>
-      </div>
-
-      {rfi.description && <div className="co-notes">{rfi.description}</div>}
-
-      {linkedSubmissions.length > 0 && (
-        <div className="co-linked-section">
-          <div className="co-linked-section-label">
-            <i className="bi bi-link-45deg" /> Linked Submissions ({linkedSubmissions.length})
-          </div>
-          <div className="co-linked-submissions">
-            {linkedSubmissions.map((s) => (
-              <div className="co-linked-row" key={s.id}>
-                <div className="co-linked-row-icon">
-                  <i className="bi bi-link-45deg" />
-                </div>
-                <span className="co-linked-row-name" title={s.submission_name || "Unknown submission"}>
-                  <span className="co-linked-row-id">#{s.id}</span> {s.submission_name || "Unknown submission"}
-                </span>
-                <div className="co-linked-row-meta">
-                  {s.status ? <StatusBadge status={s.status} tag={s.tag} /> : null}
-                  {s.percentage != null && <span className="submission-row-pct">{s.percentage}%</span>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="co-chip-row">
-        <span className="co-chip">
-          <i className="bi bi-calendar3" /> <span className="co-chip-label">RFI Date</span> {fmtDateLong(rfi.date)}
-        </span>
-        <span className="co-chip co-chip-amber">
-          <i className="bi bi-clock" /> <span className="co-chip-label">Expected</span>{" "}
-          {fmtDateLong(rfi.expected_response_date)}
-        </span>
-        {rfi.actual_return_date && (
-          <span className="co-chip co-chip-green">
-            <i className="bi bi-calendar-check" /> <span className="co-chip-label">Returned</span>{" "}
-            {fmtDateLong(rfi.actual_return_date)}
+        <div className="rfi-row-bottom">
+          <span className={`co-status-pill rfi-status-${statusKey}`}>
+            <i className={`bi ${STATUS_ICON[rfi.status] || "bi-hourglass-split"}`} /> {rfi.status.toUpperCase()}
           </span>
-        )}
+
+          <div className="rfi-row-progress">
+            <div className="rfi-row-progress-track">
+              <div
+                className="rfi-row-progress-bar"
+                style={{ width: `${pct}%`, background: pct === 100 ? "#22c55e" : "#f0b429" }}
+              />
+            </div>
+            <span className="rfi-row-progress-pct">{pct}%</span>
+          </div>
+
+          <div className="rfi-row-actions" onClick={(e) => e.stopPropagation()}>
+            {canEdit && (
+              <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onEdit(rfi)}>
+                <i className="bi bi-pencil" /> Edit
+              </button>
+            )}
+            {canDelete && (
+              <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => onDelete(rfi)}>
+                <i className="bi bi-trash" /> Delete
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="co-card-bottom">
-        <div className="co-created-by">
-          <i className="bi bi-person" /> {rfi.created_by || "—"}
-        </div>
-        {canEdit ? (
-          <div className="co-approval-controls">
-            <span className="co-billed-label">Response Received</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={received}
-              className={`switch-toggle${received ? " on" : ""}`}
-              onClick={() => onSetResponseReceived(rfi, !received)}
-            >
-              <span className="switch-thumb" />
-            </button>
-            <span className="co-billed-status-text">{received ? "Received" : "Not received"}</span>
-          </div>
-        ) : (
-          <span className="co-billed-status-text">{received ? "Received" : "Not received"}</span>
-        )}
-      </div>
+      <i className="bi bi-chevron-right rfi-row-chevron" aria-hidden="true" />
     </div>
   );
 }

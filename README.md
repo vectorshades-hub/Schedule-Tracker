@@ -5,7 +5,7 @@ A full rewrite of the Flask + PostgreSQL "Schedule Tracker" app as **React (Next
 ```
 schedule-tracker-mern/
 ├── server/     Express API (port 8008) + MongoDB models + migration script
-└── client/     Next.js frontend (port 5005)
+└── client/     Next.js frontend (port 5000)
 ```
 
 ## 1. Prerequisites
@@ -65,10 +65,10 @@ Re-running the migration is safe for users/records/master-lists/notifications (u
 cd client
 copy .env.local.example .env.local
 npm install
-npm run dev          # http://localhost:5005
+npm run dev          # http://localhost:5000
 ```
 
-Open http://localhost:5005/login.
+Open http://localhost:5000/login.
 
 ## 5. What's different from the Flask app (deliberately)
 

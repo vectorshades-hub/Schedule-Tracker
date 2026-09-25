@@ -10,7 +10,14 @@ import {
   useUpdateChangeOrder,
   useDeleteChangeOrder,
 } from "../hooks/useChangeOrders";
-import { useRfis, useCreateRfi, useUpdateRfi, useDeleteRfi, useSetRfiResponseReceived } from "../hooks/useRfis";
+import {
+  useRfis,
+  useCreateRfi,
+  useUpdateRfi,
+  useDeleteRfi,
+  useSetRfiResponseReceived,
+  useSetRfiQuestionResponseReceived,
+} from "../hooks/useRfis";
 import { useProjectActivity } from "../hooks/useActivityLog";
 import {
   computeProjectLifecycle,
@@ -30,6 +37,7 @@ import CreateChangeOrderModal from "./CreateChangeOrderModal";
 import ChangeOrderCard from "./ChangeOrderCard";
 import CreateRfiModal from "./CreateRfiModal";
 import RfiCard from "./RfiCard";
+import RfiDetailsModal from "./RfiDetailsModal";
 import ImageLightboxModal from "./ImageLightboxModal";
 
 /** A color-coded icon + title(+count)/subtitle + optional action buttons —
@@ -217,6 +225,7 @@ export default function SubmissionOverview({
   const [rfiModalOpen, setRfiModalOpen] = useState(false);
   const [editingRfi, setEditingRfi] = useState(null); // the RFI row being edited, or null (create mode)
   const [deleteTargetRfi, setDeleteTargetRfi] = useState(null);
+  const [viewingRfiId, setViewingRfiId] = useState(null); // id of the RFI shown in RfiDetailsModal, or null
   const [rfiFilter, setRfiFilter] = useState("All"); // "All" | "Pending" | "Overdue" | "Returned"
   const [coFilter, setCoFilter] = useState("All"); // "All" or a CHANGE_ORDER_STATUSES key
   const [subTypeFilter, setSubTypeFilter] = useState(""); // "" (all) or a submission_type
@@ -234,6 +243,7 @@ export default function SubmissionOverview({
   const updateRfi = useUpdateRfi();
   const deleteRfi = useDeleteRfi();
   const setRfiResponse = useSetRfiResponseReceived();
+  const setRfiQuestionResponse = useSetRfiQuestionResponseReceived();
   const { data: deletedActivityData } = useProjectActivity(projectName);
   const lifecycle = computeProjectLifecycle(records);
   if (!lifecycle) return null;
@@ -363,6 +373,9 @@ export default function SubmissionOverview({
   }
 
   const rfis = rfiData?.rfis || [];
+  // Looked up by id (not stored as a snapshot) so toggling a question's
+  // response inside RfiDetailsModal reflects the refetch immediately.
+  const viewingRfi = viewingRfiId ? rfis.find((r) => r.id === viewingRfiId) || null : null;
   const deletedEvents = deletedActivityData?.entries || [];
   const filteredRfis = rfiFilter === "All" ? rfis : rfis.filter((r) => r.status === rfiFilter);
   const submissionTypes = [...new Set(records.map((r) => r.submission_type).filter(Boolean))].sort();
@@ -385,11 +398,11 @@ export default function SubmissionOverview({
     coFilter === "All" ? changeOrders : changeOrders.filter((co) => getChangeOrderStatus(co).key === coFilter);
 
   function exportRfisCSV() {
-    const headers = ["Type", "Title", "Description", "RFI Date", "Expected Response", "Actual Return", "Status", "Created By"];
+    const headers = ["Type", "Title", "Questions", "RFI Date", "Expected Response", "Actual Return", "Status", "Created By"];
     const rows = rfis.map((r) => [
       r.type,
       r.title,
-      r.description,
+      (r.questions || []).map((q) => q.text).join(" | "),
       r.date,
       r.expected_response_date,
       r.actual_return_date,
@@ -425,10 +438,9 @@ export default function SubmissionOverview({
       project: projectName,
       type: form.type,
       title: form.title,
-      description: form.description,
+      questions: form.questions || [],
       date: form.date,
       expected_response_date: form.expected_response_date,
-      actual_return_date: form.actual_return_date,
       linked_submission_ids: form.linked_submission_ids || [],
     };
     try {
@@ -455,20 +467,28 @@ export default function SubmissionOverview({
     }
   }
 
-  async function handleSetRfiResponse(rfi, received) {
+  // A "legacy" question id means this RFI predates per-question tracking and
+  // has no real question subdocument yet — fall back to the whole-RFI toggle
+  // (see rfis.js's toRow(), which synthesizes that placeholder question).
+  async function handleSetRfiQuestionResponse(rfi, questionId, received) {
     try {
-      await setRfiResponse.mutateAsync({ id: rfi.id, received });
+      if (questionId === "legacy") {
+        await setRfiResponse.mutateAsync({ id: rfi.id, received });
+      } else {
+        await setRfiQuestionResponse.mutateAsync({ id: rfi.id, questionId, received });
+      }
       refetchRfis();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Failed to update response status.");
     }
   }
 
-  function confirmSetRfiResponse(rfi, received) {
+  function confirmSetRfiQuestionResponse(rfi, questionId, received) {
+    const question = (rfi.questions || []).find((q) => q.id === questionId);
     requestConfirm(
       received ? "Mark Response Received" : "Mark Not Received",
-      `Mark "${rfi.title}" as ${received ? "response received" : "not received"}?`,
-      () => handleSetRfiResponse(rfi, received)
+      `Mark this question as ${received ? "response received" : "not received"}?${question ? ` "${question.text}"` : ""}`,
+      () => handleSetRfiQuestionResponse(rfi, questionId, received)
     );
   }
 
@@ -885,7 +905,8 @@ export default function SubmissionOverview({
                         canDelete={canDeleteRfis}
                         onEdit={openEditRfi}
                         onDelete={setDeleteTargetRfi}
-                        onSetResponseReceived={confirmSetRfiResponse}
+                        onView={() => setViewingRfiId(rfi.id)}
+                        onSetQuestionResponseReceived={confirmSetRfiQuestionResponse}
                         submissionOptions={records}
                       />
                     ))}
@@ -1007,6 +1028,7 @@ export default function SubmissionOverview({
         open={!!pendingAction}
         onClose={() => setPendingAction(null)}
         title={pendingAction?.title || "Confirm"}
+        aboveModals
         footer={
           <>
             <button className="btn btn-secondary" onClick={() => setPendingAction(null)}>Cancel</button>
@@ -1110,6 +1132,23 @@ export default function SubmissionOverview({
         onSubmit={submitRfi}
         submitting={editingRfi ? updateRfi.isPending : createRfi.isPending}
         initial={editingRfi}
+        submissionOptions={records}
+      />
+
+      {/* Rendered here, outside .detail-panel, deliberately — .detail-panel:hover
+       * applies a `transform`, which turns it into the containing block for any
+       * position:fixed descendant (see .settings-permission-card:hover's comment
+       * in globals.css for the same issue), clipping this modal to the panel's
+       * bounds instead of the viewport whenever the mouse is still over the panel. */}
+      <RfiDetailsModal
+        open={!!viewingRfi}
+        onClose={() => setViewingRfiId(null)}
+        rfi={viewingRfi}
+        canEdit={canEditCoRfi}
+        canDelete={canDeleteRfis}
+        onEdit={openEditRfi}
+        onDelete={setDeleteTargetRfi}
+        onSetQuestionResponseReceived={confirmSetRfiQuestionResponse}
         submissionOptions={records}
       />
 

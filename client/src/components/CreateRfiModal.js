@@ -18,15 +18,18 @@ function addDaysISO(iso, days) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+function emptyQuestion() {
+  return { text: "", answer: "", response_received_date: "" };
+}
+
 function emptyForm() {
   const today = todayISO();
   return {
     type: "RFI",
     title: "",
-    description: "",
+    questions: [emptyQuestion()],
     date: today,
     expected_response_date: addDaysISO(today, 2), // a 2-day turnaround is just a starting default, freely editable
-    actual_return_date: "",
     linked_submission_ids: [],
   };
 }
@@ -48,10 +51,12 @@ export default function CreateRfiModal({ open, onClose, onSubmit, submitting, in
         ? {
             type: initial.type || "RFI",
             title: initial.title || "",
-            description: initial.description || "",
+            questions:
+              initial.questions && initial.questions.length
+                ? initial.questions.map((q) => ({ text: q.text || "", answer: q.answer || "", response_received_date: q.response_received_date || "" }))
+                : [emptyQuestion()],
             date: initial.date || todayISO(),
             expected_response_date: initial.expected_response_date || todayISO(),
-            actual_return_date: initial.actual_return_date || "",
             linked_submission_ids: (initial.linked_submission_ids || []).map(String),
           }
         : emptyForm()
@@ -93,9 +98,21 @@ export default function CreateRfiModal({ open, onClose, onSubmit, submitting, in
     setForm((f) => ({ ...f, linked_submission_ids: (f.linked_submission_ids || []).filter((x) => String(x) !== String(id)) }));
   }
 
+  function updateQuestion(idx, patch) {
+    setForm((f) => ({ ...f, questions: f.questions.map((q, i) => (i === idx ? { ...q, ...patch } : q)) }));
+  }
+
+  function addQuestion() {
+    setForm((f) => ({ ...f, questions: [...f.questions, emptyQuestion()] }));
+  }
+
+  function removeQuestion(idx) {
+    setForm((f) => ({ ...f, questions: f.questions.filter((_, i) => i !== idx) }));
+  }
+
   return (
     <div className="st-modal-backdrop co-modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="st-modal co-modal" style={{ maxWidth: 720 }}>
+      <div className="st-modal co-modal" style={{ maxWidth: 1140 }}>
         <div className="co-modal-header">
           <div className="co-modal-header-icon co-modal-header-icon-amber">
             <i className="bi bi-journal-bookmark-fill" />
@@ -138,14 +155,56 @@ export default function CreateRfiModal({ open, onClose, onSubmit, submitting, in
                 />
               </div>
               <div className="col-12">
-                <label className="form-label small fw-bold">Description</label>
-                <textarea
-                  className="form-control"
-                  rows={3}
-                  placeholder="Describe the information needed…"
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                />
+                <label className="form-label small fw-bold rfi-questions-form-label">
+                  Questions <span className="text-danger">*</span>
+                  <span className="co-linked-count">{form.questions.length}</span>
+                </label>
+                <div className="rfi-questions-form-hint">Add each item you need clarified — every question tracks its own response date.</div>
+                <div className="rfi-question-form-list">
+                  {form.questions.map((q, idx) => (
+                    <div className={`rfi-question-form-card${q.response_received_date ? " rfi-question-form-card-received" : ""}`} key={idx}>
+                      <div className="rfi-question-form-head">
+                        <span className={`rfi-question-badge${q.response_received_date ? " rfi-question-badge-received" : ""}`}>Q{idx + 1}</span>
+                        {form.questions.length > 1 && (
+                          <button
+                            type="button"
+                            className="rfi-question-remove"
+                            onClick={() => removeQuestion(idx)}
+                            aria-label={`Remove question ${idx + 1}`}
+                          >
+                            <i className="bi bi-x-lg" />
+                          </button>
+                        )}
+                      </div>
+                      <textarea
+                        className="form-control" rows={2} required placeholder="Describe the information needed…"
+                        value={q.text} onChange={(e) => updateQuestion(idx, { text: e.target.value })}
+                      />
+                      <div className="rfi-question-answer-field">
+                        <label className="rfi-question-answer-label">
+                          Response
+                        </label>
+                        <textarea
+                          className="form-control" rows={2} placeholder="Enter the answer, once received…" value={q.answer}
+                          onChange={(e) => updateQuestion(idx, { answer: e.target.value })}
+                        />
+                      </div>
+                      <div className="rfi-question-form-footer">
+                        <label className={`rfi-question-date-label${q.response_received_date ? " rfi-question-date-label-received" : ""}`}>
+                          <i className="bi bi-calendar-check" /> Response Received
+                        </label>
+                        <input
+                          type="date"
+                          className="form-control form-control-sm rfi-question-date-input" value={q.response_received_date}
+                          onChange={(e) => updateQuestion(idx, { response_received_date: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" className="rfi-add-question-btn" onClick={addQuestion}>
+                  <i className="bi bi-plus-lg" /> Add Question
+                </button>
               </div>
               <div className="col-12">
                 <label className="form-label small fw-bold co-linked-label">
@@ -241,17 +300,6 @@ export default function CreateRfiModal({ open, onClose, onSubmit, submitting, in
                   required
                   value={form.expected_response_date}
                   onChange={(e) => setForm((f) => ({ ...f, expected_response_date: e.target.value }))}
-                />
-              </div>
-              <div className="col-12">
-                <label className="form-label small fw-bold">
-                  Actual Return Date <span className="co-optional-label">(optional)</span>
-                </label>
-                <input
-                  type="date"
-                  className="form-control"
-                  value={form.actual_return_date}
-                  onChange={(e) => setForm((f) => ({ ...f, actual_return_date: e.target.value }))}
                 />
               </div>
             </div>

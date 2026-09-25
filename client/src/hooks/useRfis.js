@@ -34,11 +34,22 @@ export function useDeleteRfi() {
   });
 }
 
-/** "Response Received" toggle — reversible (see rfis.js's POST /:id/response). */
+/** Legacy whole-RFI "Response Received" toggle, for RFIs with no per-question
+ * tracking yet — reversible (see rfis.js's POST /:id/response). */
 export function useSetRfiResponseReceived() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, received }) => api.post(`/rfis/${id}/response`, { received }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rfis"] }),
+  });
+}
+
+/** Per-question "Response Received" toggle — reversible (see rfis.js's
+ * POST /:id/questions/:qid/response). */
+export function useSetRfiQuestionResponseReceived() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, questionId, received }) => api.post(`/rfis/${id}/questions/${questionId}/response`, { received }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rfis"] }),
   });
 }
