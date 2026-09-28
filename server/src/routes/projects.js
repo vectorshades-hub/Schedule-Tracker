@@ -7,6 +7,7 @@ const upload = require("../middleware/upload");
 const { writeLog } = require("../services/logging");
 const statusEngine = require("../services/statusEngine");
 const { canUpdateRecords } = require("../services/settingsService");
+const { getTeamsFromUsers } = require("../services/userHelpers");
 const {
   PROJECT_IMAGES_DIR,
   sanitizeFilename,
@@ -24,17 +25,22 @@ const router = createSafeRouter();
  * just admin/management/team_lead — `projects`/`clients` stay flat name
  * arrays for existing consumers (record forms, reports, drilldowns);
  * `projectDetails` adds each project's client for the Manage Projects &
- * Clients page's grouped view.
+ * Clients page's grouped view. `teams` (team_lead/management usernames)
+ * rides along too — the Reports export modal's Team and Created By pickers
+ * (submissions are only ever created by a team lead or management user)
+ * need the full org-wide list, not just the caller's own allowed teams.
  */
 router.get("/", requireAuth, async (req, res) => {
-  const [projects, clients] = await Promise.all([
+  const [projects, clients, teams] = await Promise.all([
     Project.find({}).sort({ name: 1 }).lean(),
     Client.find({}).sort({ name: 1 }).lean(),
+    getTeamsFromUsers(),
   ]);
   res.json({
     projects: projects.map((p) => p.name),
     clients: clients.map((c) => c.name),
     projectDetails: projects.map((p) => ({ name: p.name, client: p.client || "" })),
+    teams,
   });
 });
 

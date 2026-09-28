@@ -19,10 +19,9 @@ router.post("/export", requireRole("admin", "management"), async (req, res) => {
   if (b.f_client) records = records.filter((r) => eq(r.client, b.f_client));
   if (b.f_type) records = records.filter((r) => eq(r.submission_type, b.f_type));
   if (b.f_status) records = records.filter((r) => startsWith(r.status, b.f_status));
-  if (b.f_created_by) {
-    const cb = String(b.f_created_by).toLowerCase();
-    records = records.filter((r) => r.created_by.toLowerCase().includes(cb));
-  }
+  if (b.f_created_by) records = records.filter((r) => eq(r.created_by, b.f_created_by));
+  if (b.f_billable) records = records.filter((r) => eq(r.billable, b.f_billable));
+  if (b.f_invoice_released) records = records.filter((r) => eq(r.invoice_released, b.f_invoice_released));
   if (b.f_sub_from) records = records.filter((r) => (r.sub_date_raw || "") >= b.f_sub_from);
   if (b.f_sub_to) records = records.filter((r) => (r.sub_date_raw || "") <= b.f_sub_to);
   if (b.f_due_from) records = records.filter((r) => (r.due_date_raw || "") >= b.f_due_from);

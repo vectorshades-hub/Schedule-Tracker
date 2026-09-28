@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../lib/AuthContext";
 import NotificationBell from "./NotificationBell";
 import Modal from "./Modal";
+import ReportsExportModal from "./ReportsExportModal";
 import UserRoleFields from "./UserRoleFields";
 import { api, ApiError } from "../lib/api";
 import { ROLE_BADGE_STYLES } from "../lib/statusStyles";
@@ -25,6 +26,7 @@ export default function AppLayout({ children, allow }) {
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [addForm, setAddForm] = useState(EMPTY_USER_FORM);
   const [teamLeadAndMgmt, setTeamLeadAndMgmt] = useState([]);
+  const [reportsOpen, setReportsOpen] = useState(false);
 
   useEffect(() => {
     if (loading) return;
@@ -120,7 +122,11 @@ export default function AppLayout({ children, allow }) {
           {["admin", "management", "team_lead", "qaqc", "user"].includes(role) && (
             <a href="/editing-log"><i className="bi bi-pencil-square" /> Editing Log</a>
           )}
-          {["admin", "management"].includes(role) && <a href="/reports"><i className="bi bi-file-earmark-bar-graph-fill" /> Reports</a>}
+          {["admin", "management"].includes(role) && (
+            <a href="#" onClick={(e) => { e.preventDefault(); setReportsOpen(true); }}>
+              <i className="bi bi-file-earmark-bar-graph-fill" /> Reports
+            </a>
+          )}
           {(["admin", "management"].includes(role) || user.can_edit_invoice_released) && (
             <a href="/management-dashboard"><i className="bi bi-graph-up-arrow" /> Management Dashboard</a>
           )}
@@ -164,6 +170,10 @@ export default function AppLayout({ children, allow }) {
           <input type="password" className="form-control mb-2" value={addForm.confirm_password} onChange={(e) => setAddForm((f) => ({ ...f, confirm_password: e.target.value }))} />
           <UserRoleFields form={addForm} setForm={setAddForm} teamLeadAndMgmtUsernames={teamLeadAndMgmt} />
         </Modal>
+      )}
+
+      {["admin", "management"].includes(role) && (
+        <ReportsExportModal open={reportsOpen} onClose={() => setReportsOpen(false)} />
       )}
     </div>
   );
