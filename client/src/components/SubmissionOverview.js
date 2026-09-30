@@ -1099,8 +1099,6 @@ export default function SubmissionOverview({
         onSubmit={submitChangeOrder}
         submitting={editingCO ? updateCO.isPending : createCO.isPending}
         initial={editingCO}
-        teamOptions={coDashboardConfig?.selectableTeams || []}
-        defaultTeam={coDashboardConfig?.defaultTeam || ""}
         submissionOptions={records}
       />
 

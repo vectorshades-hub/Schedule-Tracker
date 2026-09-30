@@ -105,6 +105,15 @@ router.get("/", requireAuth, async (req, res) => {
   res.json({ change_orders: visible.map(toRow) });
 });
 
+/** Team for a CO created without one: the first linked submission's team, else the
+ * project's most recent submission's team, else "" (blank = visible to everyone). */
+async function deriveTeam(project, linkedIds) {
+  const ids = (linkedIds || []).map(Number).filter(Number.isFinite);
+  const query = ids.length ? { legacyId: { $in: ids } } : { project };
+  const rec = await Record.findOne(query).sort({ createdAt: -1 }).select("team").lean();
+  return rec?.team || "";
+}
+
 /** POST /api/change-orders — create a change order (admin/management only). */
 router.post("/", requireRole("admin", "management"), async (req, res) => {
   const user = req.session.username;
@@ -112,13 +121,15 @@ router.post("/", requireRole("admin", "management"), async (req, res) => {
   try {
     const project = String(b.project || "").trim();
     const coNumber = String(b.co_number || "").trim();
-    const team = String(b.team || "").trim();
     const dateRaw = String(b.date || "").trim();
     const changeType = String(b.change_type || "").trim();
 
-    if (!project || !coNumber || !team || !dateRaw || !changeType) {
+    if (!project || !coNumber || !dateRaw || !changeType) {
       return res.status(400).json({ ok: false, error: "Please fill all required fields." });
     }
+
+    const linkedIds = parseLinkedSubmissionIds(b.linked_submission_ids);
+    const team = String(b.team || "").trim() || (await deriveTeam(project, linkedIds));
 
     const hours = Number(b.hours);
     const hoursVal = Number.isFinite(hours) ? hours : 0;
@@ -156,11 +167,10 @@ router.put("/:id", requireRole("admin", "management"), async (req, res) => {
   try {
     const project = String(b.project || "").trim();
     const coNumber = String(b.co_number || "").trim();
-    const team = String(b.team || "").trim();
     const dateRaw = String(b.date || "").trim();
     const changeType = String(b.change_type || "").trim();
 
-    if (!project || !coNumber || !team || !dateRaw || !changeType) {
+    if (!project || !coNumber || !dateRaw || !changeType) {
       return res.status(400).json({ ok: false, error: "Please fill all required fields." });
     }
 
@@ -168,12 +178,14 @@ router.put("/:id", requireRole("admin", "management"), async (req, res) => {
     const hoursVal = Number.isFinite(hours) ? hours : 0;
     const amount = Number(b.amount);
     const amountVal = Number.isFinite(amount) ? amount : 0;
+    // The form no longer has a Team field — only touch `team` if one is sent.
+    const teamUpdate = String(b.team || "").trim() ? { team: String(b.team).trim() } : {};
     const co = await ChangeOrder.findByIdAndUpdate(
       req.params.id,
       {
         project,
         coNumber,
-        team,
+        ...teamUpdate,
         date: statusEngine.parseDate(dateRaw),
         changeType,
         notes: String(b.notes || "").trim(),

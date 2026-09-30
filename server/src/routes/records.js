@@ -28,6 +28,17 @@ const BILLABLE_ROLES = ["admin", "management", "team_lead"];
 const OFA_TYPES = new Set(["OFA", "REAPPROVAL", "FOR REVIEW"]);
 const FAB_TYPES = new Set(["FAB", "FIELD USE", "REVISION"]);
 
+// A record's creator can edit it for this long after creation, even without
+// the Settings-page "update records" permission. Mirrored in
+// client/src/lib/recordEditAccess.js.
+const OWN_EDIT_WINDOW_MS = 60 * 60 * 1000;
+
+function withinOwnEditWindow(row) {
+  if (!row.createdAt) return false;
+  const age = Date.now() - new Date(row.createdAt).getTime();
+  return age >= 0 && age < OWN_EDIT_WINDOW_MS;
+}
+
 const router = createSafeRouter();
 
 /** GET /api/records/due-date?sub_date=YYYY-MM-DD — sub_date + 7 days. */
@@ -361,10 +372,15 @@ router.put("/:id", requireAuth, upload.single("onhold_file"), async (req, res) =
   const user = req.session.username;
   const role = req.session.role;
   try {
-    if (!(await canUpdateRecords(req.session.userId, role))) {
-      return res.status(403).json({ ok: false, error: "You don't have permission to update records." });
-    }
     const recordId = req.params.id;
+    if (!(await canUpdateRecords(req.session.userId, role))) {
+      // No general permission — any record is still editable for
+      // OWN_EDIT_WINDOW_MS after it was created.
+      const own = await Record.findOne({ legacyId: recordId }).select("createdAt").lean();
+      if (!own || !withinOwnEditWindow(own)) {
+        return res.status(403).json({ ok: false, error: "You don't have permission to update records." });
+      }
+    }
     const b = req.body;
 
     const project = (b.project || "").trim();
@@ -535,6 +551,14 @@ router.post("/:id/toggle-field", requireAuth, async (req, res) => {
     const [mapped, allowedRoles] = entry;
     if (!allowedRoles.includes(req.session.role)) {
       return res.status(403).json({ ok: false, error: "Not allowed." });
+    }
+    // Billable follows the record-edit rule: update permission, or within
+    // the first hour after the record was created.
+    if (field === "billable" && !(await canUpdateRecords(req.session.userId, req.session.role))) {
+      const row = await Record.findOne({ legacyId: req.params.id }).select("createdAt").lean();
+      if (!row || !withinOwnEditWindow(row)) {
+        return res.status(403).json({ ok: false, error: "Not allowed." });
+      }
     }
     dbField = mapped;
   }

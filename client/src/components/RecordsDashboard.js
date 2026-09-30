@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../lib/AuthContext";
 import { api, ApiError } from "../lib/api";
+import { canEditRecord } from "../lib/recordEditAccess";
 import {
   useRecordsQuery,
   useDashboardConfig,
@@ -141,6 +142,8 @@ export default function RecordsDashboard() {
 
   function openEdit(r) {
     setEditing(r);
+    // The edit panel renders at the top of the page; bring it into view.
+    window.scrollTo({ top: 0, behavior: "smooth" });
     // Must start locked to the record's current override (COMPLETED/ON HOLD),
     // matching the single option editStatusOptions offers for those cases
     // below — otherwise this stays "" (Auto) while the dropdown visually
@@ -603,7 +606,7 @@ export default function RecordsDashboard() {
                   <SwitchToggle label="QA Done" value={r.qaqc} disabled={!canQaqc} requestConfirm={requestToggleConfirm} onChange={(v) => toggleQaqc.mutate({ id: r.id, value: v })} />
                 </td>
                 <td>
-                  <SwitchToggle label="Billable" value={r.billable} disabled={!canEditBillable} requestConfirm={requestToggleConfirm} onChange={(v) => toggleField.mutate({ id: r.id, field: "billable", value: v })} />
+                  <SwitchToggle label="Billable" value={r.billable} disabled={!canEditBillable || !canEditRecord(user, r)} requestConfirm={requestToggleConfirm} onChange={(v) => toggleField.mutate({ id: r.id, field: "billable", value: v })} />
                 </td>
                 <td>
                   <SwitchToggle label="Invoice Released" value={r.invoice_released} disabled={!canEditInvoiceReleased} requestConfirm={requestToggleConfirm} onChange={(v) => toggleField.mutate({ id: r.id, field: "invoice_released", value: v })} />
@@ -612,7 +615,7 @@ export default function RecordsDashboard() {
                   <button className="btn btn-sm btn-outline-secondary" title="Info" onClick={() => setInfoView(r)}>
                     <i className="bi bi-info-circle" />
                   </button>
-                  {canEditRecords && (
+                  {canEditRecord(user, r) && (
                     <button className="btn btn-sm btn-outline-primary ms-1" onClick={() => openEdit(r)}>
                       <i className="bi bi-pencil" />
                     </button>
@@ -622,7 +625,7 @@ export default function RecordsDashboard() {
                       <i className="bi bi-trash" />
                     </button>
                   )}
-                  {!canEditRecords && !canDeleteRecords && (
+                  {!canEditRecord(user, r) && !canDeleteRecords && (
                     <button className="btn btn-sm btn-outline-secondary ms-1" disabled title="View only">
                       <i className="bi bi-eye-slash" />
                     </button>

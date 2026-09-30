@@ -71,11 +71,6 @@ export default function ChangeOrderCard({ co, canEdit, canDelete, onEdit, onDele
       )}
 
       <div className="co-chip-row">
-        {co.team && (
-          <span className="co-chip co-chip-muted">
-            <i className="bi bi-people" /> <span className="co-chip-label">Team</span> {co.team}
-          </span>
-        )}
         <span className="co-chip">
           <i className="bi bi-calendar3" /> <span className="co-chip-label">Date</span> {fmtDateLong(co.date)}
         </span>

@@ -34,15 +34,18 @@ export default function LoginPage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!pickedName || pickedName !== displayValue) {
+    const typed = displayValue.trim();
+    if (!typed) {
       setNameError(true);
       return;
     }
+    // Manual entry is allowed; snap to the canonical name when it matches one.
+    const name = usernames.find((u) => u.toLowerCase() === typed.toLowerCase()) || typed;
     setNameError(false);
     setError("");
     setBusy(true);
     try {
-      await login(pickedName, password);
+      await login(name, password);
       router.push("/");
     } catch (e2) {
       setError(e2 instanceof ApiError ? e2.message : "Login failed.");
@@ -95,7 +98,7 @@ export default function LoginPage() {
                 </div>
               )}
             />
-            {nameError && <div className="text-danger small mt-1">Please pick your name from the list.</div>}
+            {nameError && <div className="text-danger small mt-1">Please enter your name.</div>}
           </div>
 
           <div className="login-field">

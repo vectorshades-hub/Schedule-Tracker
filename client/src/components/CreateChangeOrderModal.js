@@ -22,7 +22,7 @@ const EMPTY_FORM = { co_number: "", team: "", date: todayISO(), change_type: "",
  *
  * Doubles as the Edit modal — pass `initial` (a change_orders row) to
  * pre-fill the form and switch the header/submit copy; omit it to create. */
-export default function CreateChangeOrderModal({ open, onClose, onSubmit, submitting, initial, teamOptions = [], defaultTeam = "", submissionOptions = [] }) {
+export default function CreateChangeOrderModal({ open, onClose, onSubmit, submitting, initial, submissionOptions = [] }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [linkQuery, setLinkQuery] = useState("");
   const [linkOpen, setLinkOpen] = useState(false);
@@ -46,11 +46,11 @@ export default function CreateChangeOrderModal({ open, onClose, onSubmit, submit
             currency: initial.currency || "USD",
             amount: initial.amount || initial.amount === 0 ? String(initial.amount) : "",
           }
-        : { ...EMPTY_FORM, team: defaultTeam }
+        : { ...EMPTY_FORM }
     );
     setLinkQuery("");
     setLinkOpen(false);
-  }, [open, initial, defaultTeam]);
+  }, [open, initial]);
 
   useEffect(() => {
     function onDocClick(e) {
@@ -105,7 +105,7 @@ export default function CreateChangeOrderModal({ open, onClose, onSubmit, submit
         <form onSubmit={handleSubmit}>
           <div className="st-modal-body">
             <div className="row g-3">
-              <div className="col-4">
+              <div className="col-6">
                 <label className="form-label small fw-bold">
                   CO # <span className="text-danger">*</span>
                 </label>
@@ -117,19 +117,7 @@ export default function CreateChangeOrderModal({ open, onClose, onSubmit, submit
                   onChange={(e) => setForm((f) => ({ ...f, co_number: e.target.value }))}
                 />
               </div>
-              <div className="col-4">
-                <label className="form-label small fw-bold">
-                  Team <span className="text-danger">*</span>
-                </label>
-                <SearchableDropdown
-                  value={form.team}
-                  onChange={(v) => setForm((f) => ({ ...f, team: v }))}
-                  options={teamOptions}
-                  placeholder="Select a team"
-                  required
-                />
-              </div>
-              <div className="col-4">
+              <div className="col-6">
                 <label className="form-label small fw-bold">
                   Date <span className="text-danger">*</span>
                 </label>

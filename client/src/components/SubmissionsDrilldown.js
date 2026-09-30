@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "../lib/api";
+import { canEditRecord } from "../lib/recordEditAccess";
 import { useAuth } from "../lib/AuthContext";
 import StatusBadge from "./StatusBadge";
 import HoldViewModal from "./HoldViewModal";
@@ -385,7 +386,7 @@ export default function SubmissionsDrilldown({ by, name }) {
                     <td>{r.created_by}</td>
                     <td>
                       <button className="btn btn-sm btn-outline-secondary" onClick={() => setInfoView(r)}><i className="bi bi-info-circle" /></button>
-                      {canEdit && (
+                      {canEditRecord(user, r) && (
                         <button className="btn btn-sm btn-outline-primary ms-1" onClick={() => openEdit(r)}><i className="bi bi-pencil" /></button>
                       )}
                       {canDelete && (
