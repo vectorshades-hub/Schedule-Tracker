@@ -398,9 +398,10 @@ export default function SubmissionOverview({
     coFilter === "All" ? changeOrders : changeOrders.filter((co) => getChangeOrderStatus(co).key === coFilter);
 
   function exportRfisCSV() {
-    const headers = ["Type", "Title", "Questions", "RFI Date", "Expected Response", "Actual Return", "Status", "Created By"];
+    const headers = ["Type", "RFI Number", "Title", "Questions", "RFI Date", "Expected Response", "Actual Return", "Status", "Created By"];
     const rows = rfis.map((r) => [
       r.type,
+      r.rfi_number,
       r.title,
       (r.questions || []).map((q) => q.text).join(" | "),
       r.date,
@@ -437,6 +438,7 @@ export default function SubmissionOverview({
     const payload = {
       project: projectName,
       type: form.type,
+      rfi_number: form.rfi_number || "",
       title: form.title,
       questions: form.questions || [],
       date: form.date,

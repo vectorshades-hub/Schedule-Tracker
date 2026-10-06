@@ -41,6 +41,7 @@ export default function RfiCard({ rfi, canEdit, canDelete, onEdit, onDelete, onV
       <div className="rfi-row-content">
         <div className="rfi-row-top">
           <span className="rfi-type-pill">{rfi.type}</span>
+          {rfi.rfi_number && <span className="rfi-row-title text-muted">#{rfi.rfi_number}</span>}
           <span className="rfi-row-title">{rfi.title}</span>
         </div>
 

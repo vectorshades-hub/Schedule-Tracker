@@ -26,6 +26,7 @@ function emptyForm() {
   const today = todayISO();
   return {
     type: "RFI",
+    rfi_number: "",
     title: "",
     questions: [emptyQuestion()],
     date: today,
@@ -50,6 +51,7 @@ export default function CreateRfiModal({ open, onClose, onSubmit, submitting, in
       initial
         ? {
             type: initial.type || "RFI",
+            rfi_number: initial.rfi_number || "",
             title: initial.title || "",
             questions:
               initial.questions && initial.questions.length
@@ -128,7 +130,7 @@ export default function CreateRfiModal({ open, onClose, onSubmit, submitting, in
         <form onSubmit={handleSubmit}>
           <div className="st-modal-body">
             <div className="row g-3">
-              <div className="col-6">
+              <div className="col-4">
                 <label className="form-label small fw-bold">Type</label>
                 <select
                   className="form-select"
@@ -142,7 +144,17 @@ export default function CreateRfiModal({ open, onClose, onSubmit, submitting, in
                   ))}
                 </select>
               </div>
-              <div className="col-6">
+              <div className="col-3">
+                <label className="form-label small fw-bold">RFI Number</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="e.g. RFI-001"
+                  value={form.rfi_number}
+                  onChange={(e) => setForm((f) => ({ ...f, rfi_number: e.target.value }))}
+                />
+              </div>
+              <div className="col-5">
                 <label className="form-label small fw-bold">
                   Title <span className="text-danger">*</span>
                 </label>

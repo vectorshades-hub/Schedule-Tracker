@@ -562,7 +562,7 @@ export default function RecordsDashboard() {
         </div>
       </div>
 
-      <div className="table-wrap">
+      <div className="table-wrap table-wrap-page-sticky">
         <table className="table table-sm mb-0">
           <thead>
             <tr>

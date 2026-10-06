@@ -68,6 +68,7 @@ function toRow(rfi) {
     id: String(rfi._id),
     project: rfi.project,
     type: rfi.type || "RFI",
+    rfi_number: rfi.rfiNumber || "",
     title: rfi.title,
     questions,
     date: rfi.date ? statusEngine.fmtDateOnlyISO(rfi.date) : "",
@@ -109,6 +110,7 @@ router.post("/", requireRole("admin", "management"), async (req, res) => {
     const rfi = await Rfi.create({
       project,
       type,
+      rfiNumber: String(b.rfi_number ?? "").trim(),
       title,
       questions,
       date: statusEngine.parseDate(dateRaw),
@@ -146,6 +148,7 @@ router.put("/:id", requireRole("admin", "management"), async (req, res) => {
       {
         project,
         type,
+        rfiNumber: String(b.rfi_number ?? "").trim(),
         title,
         questions,
         date: statusEngine.parseDate(dateRaw),

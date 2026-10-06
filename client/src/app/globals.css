@@ -219,6 +219,14 @@ tr.hold td { background: #f3e8ff !important; }
   background: #fff;
   box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
 }
+/* Lets the thead's `position: sticky` pin to the viewport top as the page
+ * scrolls — an `overflow: auto` wrapper (above) becomes the sticky container
+ * instead, and since it has no max-height it never scrolls, so the header
+ * would never stick. A too-wide table scrolls the page horizontally instead. */
+.table-wrap.table-wrap-page-sticky { overflow: visible; }
+.table-wrap.table-wrap-page-sticky table thead th { padding-top: 0.85rem; padding-bottom: 0.85rem; vertical-align: middle; }
+.table-wrap.table-wrap-page-sticky table thead th:first-child { border-top-left-radius: 10px; }
+.table-wrap.table-wrap-page-sticky table thead th:last-child { border-top-right-radius: 10px; }
 .table-wrap table { font-size: 0.82rem; margin-bottom: 0; }
 .table-wrap table thead th {
   position: sticky;

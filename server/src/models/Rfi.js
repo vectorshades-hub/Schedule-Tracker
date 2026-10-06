@@ -20,6 +20,7 @@ const rfiQuestionSchema = new mongoose.Schema(
 const rfiSchema = new mongoose.Schema({
   project: { type: String, required: true, index: true },
   type: { type: String, default: "RFI" }, // RFI | Clarification | BFA Clarification | Field Verification | GC to Verify | Other
+  rfiNumber: { type: String, default: "" },
   title: { type: String, required: true },
   description: { type: String, default: "" }, // legacy free-text body, kept for RFIs created before per-question tracking
   questions: { type: [rfiQuestionSchema], default: [] },
