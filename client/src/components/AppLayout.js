@@ -122,7 +122,7 @@ export default function AppLayout({ children, allow }) {
           {["admin", "management", "team_lead", "qaqc", "user"].includes(role) && (
             <a href="/editing-log"><i className="bi bi-pencil-square" /> Editing Log</a>
           )}
-          {["admin", "management"].includes(role) && (
+          {["admin", "management", "team_lead"].includes(role) && (
             <a href="#" onClick={(e) => { e.preventDefault(); setReportsOpen(true); }}>
               <i className="bi bi-file-earmark-bar-graph-fill" /> Reports
             </a>
@@ -172,8 +172,8 @@ export default function AppLayout({ children, allow }) {
         </Modal>
       )}
 
-      {["admin", "management"].includes(role) && (
-        <ReportsExportModal open={reportsOpen} onClose={() => setReportsOpen(false)} />
+      {["admin", "management", "team_lead"].includes(role) && (
+        <ReportsExportModal open={reportsOpen} onClose={() => setReportsOpen(false)} role={role} />
       )}
     </div>
   );

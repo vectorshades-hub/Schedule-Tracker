@@ -12,9 +12,10 @@ const EMPTY_FORM = {
   f_billable: "", f_invoice_released: "", f_sub_from: "", f_sub_to: "", f_due_from: "", f_due_to: "",
 };
 
-/** Ad-hoc filtered Excel export — org-wide, admin/management only. Opened from the navbar's "Reports" link. */
-export default function ReportsExportModal({ open, onClose }) {
+/** Ad-hoc filtered Excel export — org-wide for admin/management, scoped to own data for team leads. Opened from the navbar's "Reports" link. */
+export default function ReportsExportModal({ open, onClose, role }) {
   const toast = useToast();
+  const isTeamLead = role === "team_lead";
   const [meta, setMeta] = useState({ projects: [], clients: [], teams: [] });
   const [form, setForm] = useState(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
@@ -59,7 +60,7 @@ export default function ReportsExportModal({ open, onClose }) {
       <form id="reports-export-form" onSubmit={handleExport}>
         <label className="form-label">Group / Sort by</label>
         <div className="d-flex gap-3 mb-3">
-          {["project", "client", "team"].map((g) => (
+          {(isTeamLead ? ["project", "client"] : ["project", "client", "team"]).map((g) => (
             <label key={g} className="form-check">
               <input type="radio" className="form-check-input me-1" checked={form.group_by === g} onChange={() => set("group_by", g)} />
               {g.charAt(0).toUpperCase() + g.slice(1)}
@@ -77,10 +78,12 @@ export default function ReportsExportModal({ open, onClose }) {
             <label className="form-label">Client Name</label>
             <SearchableDropdown value={form.f_client} onChange={(v) => set("f_client", v)} options={meta.clients} placeholder="Search or select…" />
           </div>
-          <div className="col-md-4">
-            <label className="form-label">Team</label>
-            <SearchableDropdown value={form.f_team} onChange={(v) => set("f_team", v)} options={meta.teams} placeholder="Search or select…" />
-          </div>
+          {!isTeamLead && (
+            <div className="col-md-4">
+              <label className="form-label">Team</label>
+              <SearchableDropdown value={form.f_team} onChange={(v) => set("f_team", v)} options={meta.teams} placeholder="Search or select…" />
+            </div>
+          )}
 
           <div className="col-md-4">
             <label className="form-label">Submission Type</label>
@@ -140,7 +143,7 @@ export default function ReportsExportModal({ open, onClose }) {
         </div>
 
         <p className="text-muted small mt-3 mb-0">
-          <i className="bi bi-info-circle" /> Exports as .xlsx — opens in Excel. Export is org-wide (not limited to your selected teams).
+          <i className="bi bi-info-circle" /> Exports as .xlsx — opens in Excel. {role === "team_lead" ? "Export includes only the records you have access to." : "Export is org-wide (not limited to your selected teams)."}
         </p>
       </form>
     </Modal>

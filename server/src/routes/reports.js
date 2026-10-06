@@ -6,10 +6,17 @@ const { loadRecords } = require("../services/recordVisibility");
 
 const router = createSafeRouter();
 
-/** POST /api/reports/export — admin/management, ad-hoc filtered Excel export (org-wide, bypasses caller's own team scoping — matches the original). */
-router.post("/export", requireRole("admin", "management"), async (req, res) => {
+/**
+ * POST /api/reports/export — ad-hoc filtered Excel export. admin/management get
+ * the org-wide data (bypasses caller's own team scoping — matches the original);
+ * team leads get only the records they can already see on their own dashboard.
+ */
+router.post("/export", requireRole("admin", "management", "team_lead"), async (req, res) => {
   const b = req.body;
-  let records = await loadRecords("", "admin");
+  let records =
+    req.session.role === "team_lead"
+      ? await loadRecords(req.session.username, "team_lead", null, { includeAllCompleted: true })
+      : await loadRecords("", "admin");
 
   const eq = (val, filter) => !filter || String(val || "").toLowerCase() === String(filter).toLowerCase();
   const startsWith = (val, filter) => !filter || String(val || "").toUpperCase().startsWith(String(filter).toUpperCase());
