@@ -295,6 +295,12 @@ router.post("/", requireAuth, upload.single("onhold_file"), async (req, res) => 
       invoiceReleased = b.invoice_released;
     }
 
+    let percentage = 0;
+    if (b.percentage !== undefined && b.percentage !== "") {
+      const pct = Number(b.percentage);
+      if (Number.isFinite(pct)) percentage = Math.max(0, Math.min(100, Math.round(pct)));
+    }
+
     const record = await Record.create({
       legacyId,
       project,
@@ -311,7 +317,7 @@ router.post("/", requireAuth, upload.single("onhold_file"), async (req, res) => 
       completedAt,
       createdBy,
       qaqc: "",
-      percentage: 0,
+      percentage,
       billable,
       invoiceReleased,
       // Created already-COMPLETED — keep the lifecycle widget's "type" stage

@@ -15,6 +15,8 @@ const { writeLog } = require("./logging");
 async function ensureBillableChangeOrder(record, user) {
   if (record.billable !== "Yes") return false;
   if (await ChangeOrder.exists({ sourceRecordId: record.legacyId })) return false;
+  // Already linked to a CO manually — don't auto-add a second one.
+  if (await ChangeOrder.exists({ linkedSubmissionIds: record.legacyId })) return false;
 
   // CO # is a per-project 3-digit sequence — 001, 002, ... — continuing
   // from whatever numeric CO #s already exist for this project (manually

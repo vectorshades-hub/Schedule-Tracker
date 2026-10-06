@@ -110,7 +110,7 @@ export default function RecordsDashboard() {
   const records = data?.records || [];
 
   // ── Add form ──────────────────────────────────────────
-  const [addForm, setAddForm] = useState({ ...EMPTY_FORM, sub_date: todayISO(), due_date: todayISO(), team: user.role !== "admin" ? user.username : "" });
+  const [addForm, setAddForm] = useState({ ...EMPTY_FORM, percentage: "", sub_date: todayISO(), due_date: todayISO(), team: user.role !== "admin" ? user.username : "" });
   const addMutation = useAddRecord();
   const [pendingHold, setPendingHold] = useState(null); // { mode: 'add'|'edit', note, file } queued from the hold modal
   const [holdModal, setHoldModal] = useState({ open: false, mode: null, recordId: null, initial: null });
@@ -128,7 +128,7 @@ export default function RecordsDashboard() {
     try {
       const res = await addMutation.mutateAsync(fd);
       toast.success(res.message);
-      setAddForm({ ...EMPTY_FORM, sub_date: todayISO(), due_date: todayISO(), team: addForm.team });
+      setAddForm({ ...EMPTY_FORM, percentage: "", sub_date: todayISO(), due_date: todayISO(), team: addForm.team });
       setPendingHold(null);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Failed to add record.");
@@ -340,6 +340,19 @@ export default function RecordsDashboard() {
             <div className="col-md-3">
               <label className="form-label small mb-1">Remarks</label>
               <input className="form-control" placeholder="Remarks" value={addForm.remarks} onChange={(e) => setAddForm((f) => ({ ...f, remarks: e.target.value }))} />
+            </div>
+            <div className="col-md-2">
+              <label className="form-label small mb-1">Percentage % <span className="text-danger">*</span></label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                required
+                className="form-control"
+                placeholder="Percentage %"
+                value={addForm.percentage}
+                onChange={(e) => setAddForm((f) => ({ ...f, percentage: e.target.value }))}
+              />
             </div>
             {canEditBillable && (
               <div className="col-md-2">

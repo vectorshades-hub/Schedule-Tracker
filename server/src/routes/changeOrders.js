@@ -62,6 +62,48 @@ function parseLinkedSubmissionIds(raw) {
   return [...new Set(raw.map((v) => Number(v)).filter((n) => Number.isFinite(n)))];
 }
 
+/**
+ * Moves billable submissions onto the CO they were just linked to (`target`).
+ * For each linked submission that is billable and already sits on another CO:
+ * it's pulled out of that CO's manual links, and if that other CO was
+ * auto-added for it (sourceRecordId) the CO is removed from the list — unless
+ * it still carries other linked submissions, in which case it's kept and only
+ * detached from this submission.
+ */
+async function moveBillableSubmissionsToCo(target, linkedIds, user) {
+  if (!linkedIds.length) return;
+  const billable = await Record.find({ legacyId: { $in: linkedIds }, billable: "Yes" }).select("legacyId").lean();
+  const billableIds = billable.map((r) => r.legacyId);
+  if (!billableIds.length) return;
+
+  const others = await ChangeOrder.find({
+    _id: { $ne: target._id },
+    $or: [{ linkedSubmissionIds: { $in: billableIds } }, { sourceRecordId: { $in: billableIds } }],
+  });
+  for (const co of others) {
+    const remaining = (co.linkedSubmissionIds || []).filter((id) => !billableIds.includes(id));
+    const isAutoSource = co.sourceRecordId != null && billableIds.includes(co.sourceRecordId);
+    if (isAutoSource && !remaining.length) {
+      await ChangeOrder.deleteOne({ _id: co._id });
+      writeLog("DELETE-CHANGE-ORDER", `Change Order #${co.coNumber} (${co.changeType}) replaced by link to CO #${target.coNumber}`, user, co.project);
+      continue;
+    }
+    co.linkedSubmissionIds = remaining;
+    if (isAutoSource) co.sourceRecordId = null;
+    co.updatedBy = user;
+    co.updatedAt = new Date();
+    await co.save();
+  }
+}
+
+/** Marks every submission tied to a CO (manual links + auto-add source) as Invoice Released = Yes. */
+async function releaseLinkedRecordInvoices(co) {
+  const ids = new Set(co.linkedSubmissionIds || []);
+  if (co.sourceRecordId != null) ids.add(co.sourceRecordId);
+  if (!ids.size) return;
+  await Record.updateMany({ legacyId: { $in: [...ids] } }, { $set: { invoiceReleased: "Yes" } });
+}
+
 function toRow(co) {
   return {
     id: String(co._id),
@@ -153,6 +195,8 @@ router.post("/", requireRole("admin", "management"), async (req, res) => {
       createdAt: new Date(),
     });
 
+    await moveBillableSubmissionsToCo(co, co.linkedSubmissionIds || [], user);
+
     writeLog("ADD-CHANGE-ORDER", `project='${project}' co='${coNumber}'`, user);
     res.json({ ok: true, message: `Change Order #${coNumber} created.`, change_order: toRow(co) });
   } catch (e) {
@@ -202,6 +246,10 @@ router.put("/:id", requireRole("admin", "management"), async (req, res) => {
       { new: true }
     );
     if (!co) return res.status(404).json({ ok: false, error: "Change order not found." });
+
+    await moveBillableSubmissionsToCo(co, co.linkedSubmissionIds || [], user);
+    // Already-released CO: newly linked submissions follow its released state.
+    if (co.invoiceReleased === "Yes") await releaseLinkedRecordInvoices(co);
 
     writeLog("EDIT-CHANGE-ORDER", `project='${project}' co='${coNumber}'`, user);
     res.json({ ok: true, message: `Change Order #${coNumber} updated.`, change_order: toRow(co) });
@@ -350,6 +398,7 @@ router.post("/:id/invoice-released", requireAuth, async (req, res) => {
     }
 
     const co = await ChangeOrder.findByIdAndUpdate(req.params.id, update, { new: true });
+    if (value === "Yes") await releaseLinkedRecordInvoices(co);
 
     writeLog(
       "CHANGE-ORDER-INVOICE-RELEASED",
