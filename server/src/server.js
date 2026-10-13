@@ -2,6 +2,7 @@ const app = require("./app");
 const env = require("./config/env");
 const { connectDB } = require("./config/db");
 const { startBackupScheduler } = require("./services/backupJob");
+const { startFullBackupScheduler } = require("./services/fullBackup");
 
 // Defense-in-depth: every route is wrapped in asyncHandler (see middleware/asyncHandler.js)
 // so request errors are handled per-request via Express's error middleware. These are a
@@ -17,6 +18,7 @@ process.on("uncaughtException", (err) => {
 async function main() {
   await connectDB();
   startBackupScheduler();
+  startFullBackupScheduler();
   app.listen(env.port, () => {
     console.log(`[SERVER] Schedule Tracker API listening on http://localhost:${env.port}`);
   });

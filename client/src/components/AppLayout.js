@@ -5,6 +5,7 @@ import { useAuth } from "../lib/AuthContext";
 import NotificationBell from "./NotificationBell";
 import Modal from "./Modal";
 import ReportsExportModal from "./ReportsExportModal";
+import BackupModal from "./BackupModal";
 import UserRoleFields from "./UserRoleFields";
 import { api, ApiError } from "../lib/api";
 import { ROLE_BADGE_STYLES } from "../lib/statusStyles";
@@ -12,10 +13,10 @@ import { useToast } from "../lib/ToastContext";
 
 /**
  * Admin-only "⋮" overflow menu in the navbar — holds the less-used admin
- * links (Users, Add User, Bulk Upload, Activity Log, Request Log) so the
+ * links (Users, Add User, Bulk Upload, Activity Log, Request Log, Backup) so the
  * top bar stays on one line. Closes on outside click, Escape, or picking an item.
  */
-function AdminMoreMenu({ onAddUser }) {
+function AdminMoreMenu({ onAddUser, onBackup }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -52,6 +53,9 @@ function AdminMoreMenu({ onAddUser }) {
           <a href="/bulk-upload" role="menuitem"><i className="bi bi-cloud-upload-fill" /> Bulk Upload</a>
           <a href="/activity-log" role="menuitem"><i className="bi bi-clipboard-data-fill" /> Activity Log</a>
           <a href="/request-log" role="menuitem"><i className="bi bi-hdd-network-fill" /> Request Log</a>
+          <a href="#" role="menuitem" onClick={(e) => { e.preventDefault(); setOpen(false); onBackup(); }}>
+            <i className="bi bi-database-fill-down" /> Backup
+          </a>
         </div>
       )}
     </div>
@@ -75,6 +79,7 @@ export default function AppLayout({ children, allow }) {
   const [addForm, setAddForm] = useState(EMPTY_USER_FORM);
   const [teamLeadAndMgmt, setTeamLeadAndMgmt] = useState([]);
   const [reportsOpen, setReportsOpen] = useState(false);
+  const [backupOpen, setBackupOpen] = useState(false);
 
   useEffect(() => {
     if (loading) return;
@@ -176,7 +181,7 @@ export default function AppLayout({ children, allow }) {
           <div className="ms-auto d-flex align-items-center gap-3">
             {["admin", "management"].includes(role) && <NotificationBell />}
             {role === "team_lead" && <NotificationBell remindersOnly />}
-            {role === "admin" && <AdminMoreMenu onAddUser={() => setAddUserOpen(true)} />}
+            {role === "admin" && <AdminMoreMenu onAddUser={() => setAddUserOpen(true)} onBackup={() => setBackupOpen(true)} />}
             <button className="btn btn-sm btn-outline-light" onClick={logout}>
               <i className="bi bi-box-arrow-right" /> Logout
             </button>
@@ -211,6 +216,8 @@ export default function AppLayout({ children, allow }) {
           <UserRoleFields form={addForm} setForm={setAddForm} teamLeadAndMgmtUsernames={teamLeadAndMgmt} />
         </Modal>
       )}
+
+      {role === "admin" && <BackupModal open={backupOpen} onClose={() => setBackupOpen(false)} />}
 
       {["admin", "management", "team_lead"].includes(role) && (
         <ReportsExportModal open={reportsOpen} onClose={() => setReportsOpen(false)} role={role} />

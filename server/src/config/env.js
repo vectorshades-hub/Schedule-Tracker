@@ -24,6 +24,8 @@ module.exports = {
   uploadDir: process.env.UPLOAD_DIR || "./uploads",
   backupDir: process.env.BACKUP_DIR || "./uploads/backups",
   backupRetentionDays: parseInt(process.env.BACKUP_RETENTION_DAYS || "60", 10),
+  // Whole-system backups (see services/fullBackup.js) — how many archives to keep (8 ≈ two months of Sundays).
+  fullBackupKeep: parseInt(process.env.FULL_BACKUP_KEEP || "8", 10),
 
   submissionTypes: ["OFA", "FAB", "REAPPROVAL", "REVISION", "FOR REVIEW", "FIELD USE"],
   allowedImageExts: [".jpg", ".jpeg", ".png", ".gif", ".webp"],
