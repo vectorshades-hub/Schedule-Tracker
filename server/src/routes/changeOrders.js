@@ -5,7 +5,22 @@ const { writeLog } = require("../services/logging");
 const statusEngine = require("../services/statusEngine");
 const { canEditInvoiceReleased, canDeleteChangeOrders } = require("../services/settingsService");
 const { teamMatch } = require("../services/recordVisibility");
-const { getLinkedTls, getManagementUsersForTeamlead, getAllTeamleadsInManagement } = require("../services/userHelpers");
+const {
+  getLinkedTls,
+  getManagementUsersForTeamlead,
+  getAllTeamleadsInManagement,
+  getChangeOrderApprovers,
+  canApproveChangeOrder,
+} = require("../services/userHelpers");
+
+const APPROVAL_VALUES = ["Pending", "Approved", "Rejected"];
+
+/** A team-lead CO that hasn't been Approved yet — blocked from finance/invoice release. */
+function isAwaitingApproval(co) {
+  return !!co.requiresApproval && co.approval !== "Approved";
+}
+
+const AWAITING_APPROVAL_ERROR = "This change order needs management approval first.";
 
 const router = createSafeRouter();
 
@@ -116,6 +131,9 @@ function toRow(co) {
     hours: co.hours ?? 0,
     linked_submission_ids: co.linkedSubmissionIds || [],
     approval: co.approval || "Pending",
+    requires_approval: !!co.requiresApproval,
+    approval_by: co.approvalBy || "",
+    approval_at: co.approvalAt ? new Date(co.approvalAt).toISOString() : "",
     billed: !!co.billed,
     invoice_released: co.invoiceReleased || "",
     invoice_released_reason: co.invoiceReleasedReason || "",
@@ -138,13 +156,68 @@ function toRow(co) {
 }
 
 /** GET /api/change-orders?project=X — list a project's change orders, newest first,
- * scoped to the viewer's own team (see filterChangeOrdersForViewer above). */
+ * scoped to the viewer's own team (see filterChangeOrdersForViewer above). Each
+ * row also carries `approvers` (who can approve it) and `can_approve` (whether
+ * the viewer is one of them — admins always are). */
 router.get("/", requireAuth, async (req, res) => {
   const project = String(req.query.project || "").trim();
   if (!project) return res.json({ change_orders: [] });
+  const { username, role } = req.session;
   const rows = await ChangeOrder.find({ project }).sort({ createdAt: -1 }).lean();
-  const visible = await filterChangeOrdersForViewer(rows, req.session.username, req.session.role);
-  res.json({ change_orders: visible.map(toRow) });
+  const visible = await filterChangeOrdersForViewer(rows, username, role);
+
+  const approversByTeam = new Map();
+  const out = [];
+  for (const co of visible) {
+    const teamKey = (co.team || "").toLowerCase();
+    if (!approversByTeam.has(teamKey)) approversByTeam.set(teamKey, await getChangeOrderApprovers(co.team));
+    const approvers = approversByTeam.get(teamKey);
+    // Admin/management-created COs keep the old rule: any admin/management can set approval.
+    const canApprove =
+      role === "admin" || (role === "management" && (!co.requiresApproval || approvers.includes(username)));
+    out.push({ ...toRow(co), approvers, can_approve: canApprove });
+  }
+  res.json({ change_orders: out });
+});
+
+// A team-lead CO still Pending approval this many days after it was submitted
+// shows up on the Reminders page (same threshold as rfis.js's RFI reminders).
+const APPROVAL_REMINDER_AFTER_DAYS = 5;
+
+/**
+ * GET /api/change-orders/reminders — team-lead COs still Pending approval more
+ * than APPROVAL_REMINDER_AFTER_DAYS days since they were submitted (approvalAt
+ * is set when a rejected CO is resubmitted, else createdAt). Oldest first.
+ * Admins see all; management only the ones they can approve; team leads only
+ * their own.
+ */
+router.get("/reminders", requireRole("admin", "management", "team_lead"), async (req, res) => {
+  const { username, role } = req.session;
+  const today = statusEngine.todayUTC();
+  const cutoff = new Date(today.getTime() - APPROVAL_REMINDER_AFTER_DAYS * 86400000);
+  const query = { requiresApproval: true, approval: "Pending" };
+  if (role === "team_lead") query.createdBy = username;
+  const candidates = await ChangeOrder.find(query).lean();
+
+  const approversByTeam = new Map();
+  const reminders = [];
+  for (const co of candidates) {
+    const since = co.approvalAt || co.createdAt;
+    if (!since || since >= cutoff) continue;
+    const teamKey = (co.team || "").toLowerCase();
+    if (!approversByTeam.has(teamKey)) approversByTeam.set(teamKey, await getChangeOrderApprovers(co.team));
+    const approvers = approversByTeam.get(teamKey);
+    if (role === "management" && !approvers.includes(username)) continue;
+    const sinceDay = statusEngine.parseDate(since);
+    reminders.push({
+      ...toRow(co),
+      approvers,
+      pending_since: statusEngine.fmtDateOnlyISO(sinceDay),
+      days_pending: statusEngine.daysBetween(today, sinceDay),
+    });
+  }
+  reminders.sort((a, b) => b.days_pending - a.days_pending);
+  res.json({ threshold_days: APPROVAL_REMINDER_AFTER_DAYS, reminders });
 });
 
 /** Team for a CO created without one: the first linked submission's team, else the
@@ -156,9 +229,12 @@ async function deriveTeam(project, linkedIds) {
   return rec?.team || "";
 }
 
-/** POST /api/change-orders — create a change order (admin/management only). */
-router.post("/", requireRole("admin", "management"), async (req, res) => {
+/** POST /api/change-orders — create a change order (admin/management/team_lead).
+ * A team lead's CO is always for their own team, starts Pending and is flagged
+ * requiresApproval — see POST /:id/approval for who can approve it. */
+router.post("/", requireRole("admin", "management", "team_lead"), async (req, res) => {
   const user = req.session.username;
+  const isTl = req.session.role === "team_lead";
   const b = req.body;
   try {
     const project = String(b.project || "").trim();
@@ -171,7 +247,7 @@ router.post("/", requireRole("admin", "management"), async (req, res) => {
     }
 
     const linkedIds = parseLinkedSubmissionIds(b.linked_submission_ids);
-    const team = String(b.team || "").trim() || (await deriveTeam(project, linkedIds));
+    const team = isTl ? user : String(b.team || "").trim() || (await deriveTeam(project, linkedIds));
 
     const hours = Number(b.hours);
     const hoursVal = Number.isFinite(hours) ? hours : 0;
@@ -185,9 +261,10 @@ router.post("/", requireRole("admin", "management"), async (req, res) => {
       changeType,
       notes: String(b.notes || "").trim(),
       hours: hoursVal,
-      linkedSubmissionIds: parseLinkedSubmissionIds(b.linked_submission_ids),
-      approval: ["Pending", "Approved", "Rejected"].includes(b.approval) ? b.approval : "Pending",
-      billed: !!b.billed,
+      linkedSubmissionIds: linkedIds,
+      approval: !isTl && APPROVAL_VALUES.includes(b.approval) ? b.approval : "Pending",
+      requiresApproval: isTl,
+      billed: isTl ? false : !!b.billed,
       currency: String(b.currency || "USD").trim() || "USD",
       amount: amountVal,
       total: hoursVal * amountVal,
@@ -195,20 +272,40 @@ router.post("/", requireRole("admin", "management"), async (req, res) => {
       createdAt: new Date(),
     });
 
-    await moveBillableSubmissionsToCo(co, co.linkedSubmissionIds || [], user);
+    // A team lead's CO only takes over billable submissions once it's approved.
+    if (!isTl) await moveBillableSubmissionsToCo(co, co.linkedSubmissionIds || [], user);
 
-    writeLog("ADD-CHANGE-ORDER", `project='${project}' co='${coNumber}'`, user);
-    res.json({ ok: true, message: `Change Order #${coNumber} created.`, change_order: toRow(co) });
+    let message = `Change Order #${coNumber} created.`;
+    if (isTl) {
+      const approvers = await getChangeOrderApprovers(team);
+      const who = approvers.length ? `${approvers.join(", ")} or an admin` : "an admin";
+      message = `Change Order #${coNumber} submitted for approval by ${who}.`;
+    }
+    writeLog("ADD-CHANGE-ORDER", `project='${project}' co='${coNumber}'${isTl ? " (awaiting approval)" : ""}`, user);
+    res.json({ ok: true, message, change_order: toRow(co) });
   } catch (e) {
     res.status(500).json({ ok: false, error: `Error: ${e.message}` });
   }
 });
 
-/** PUT /api/change-orders/:id — edit an existing change order (admin/management only). */
-router.put("/:id", requireRole("admin", "management"), async (req, res) => {
+/** PUT /api/change-orders/:id — edit an existing change order (admin/management,
+ * or the team lead who raised it while it isn't Approved yet — saving a Rejected
+ * one resubmits it as Pending). */
+router.put("/:id", requireRole("admin", "management", "team_lead"), async (req, res) => {
   const user = req.session.username;
+  const role = req.session.role;
+  const isTl = role === "team_lead";
   const b = req.body;
   try {
+    const existing = await ChangeOrder.findById(req.params.id);
+    if (!existing) return res.status(404).json({ ok: false, error: "Change order not found." });
+    if (isTl && existing.createdBy !== user) {
+      return res.status(403).json({ ok: false, error: "You can only edit change orders you created." });
+    }
+    if (isTl && existing.approval === "Approved") {
+      return res.status(403).json({ ok: false, error: "This change order is already approved and can't be edited." });
+    }
+
     const project = String(b.project || "").trim();
     const coNumber = String(b.co_number || "").trim();
     const dateRaw = String(b.date || "").trim();
@@ -222,32 +319,40 @@ router.put("/:id", requireRole("admin", "management"), async (req, res) => {
     const hoursVal = Number.isFinite(hours) ? hours : 0;
     const amount = Number(b.amount);
     const amountVal = Number.isFinite(amount) ? amount : 0;
-    // The form no longer has a Team field — only touch `team` if one is sent.
-    const teamUpdate = String(b.team || "").trim() ? { team: String(b.team).trim() } : {};
-    const co = await ChangeOrder.findByIdAndUpdate(
-      req.params.id,
-      {
-        project,
-        coNumber,
-        ...teamUpdate,
-        date: statusEngine.parseDate(dateRaw),
-        changeType,
-        notes: String(b.notes || "").trim(),
-        hours: hoursVal,
-        linkedSubmissionIds: parseLinkedSubmissionIds(b.linked_submission_ids),
-        approval: ["Pending", "Approved", "Rejected"].includes(b.approval) ? b.approval : "Pending",
-        billed: !!b.billed,
-        currency: String(b.currency || "USD").trim() || "USD",
-        amount: amountVal,
-        total: hoursVal * amountVal,
-        updatedBy: user,
-        updatedAt: new Date(),
-      },
-      { new: true }
-    );
-    if (!co) return res.status(404).json({ ok: false, error: "Change order not found." });
+    // The form no longer has a Team field — only touch `team` if one is sent
+    // (never for a team lead: their CO stays on their own team).
+    const teamUpdate = !isTl && String(b.team || "").trim() ? { team: String(b.team).trim() } : {};
 
-    await moveBillableSubmissionsToCo(co, co.linkedSubmissionIds || [], user);
+    // Approval only moves through someone allowed to approve this CO; a team
+    // lead's edit always (re)submits it as Pending.
+    let approval = existing.approval || "Pending";
+    if (isTl) approval = "Pending";
+    else if (APPROVAL_VALUES.includes(b.approval) && (!existing.requiresApproval || (await canApproveChangeOrder(user, role, existing.team)))) {
+      approval = b.approval;
+    }
+    const approvalUpdate =
+      approval !== (existing.approval || "Pending") ? { approval, approvalBy: user, approvalAt: new Date() } : {};
+
+    existing.set({
+      project,
+      coNumber,
+      ...teamUpdate,
+      date: statusEngine.parseDate(dateRaw),
+      changeType,
+      notes: String(b.notes || "").trim(),
+      hours: hoursVal,
+      linkedSubmissionIds: parseLinkedSubmissionIds(b.linked_submission_ids),
+      ...approvalUpdate,
+      billed: isTl ? existing.billed : !!b.billed,
+      currency: String(b.currency || "USD").trim() || "USD",
+      amount: amountVal,
+      total: hoursVal * amountVal,
+      updatedBy: user,
+      updatedAt: new Date(),
+    });
+    const co = await existing.save();
+
+    if (!isAwaitingApproval(co)) await moveBillableSubmissionsToCo(co, co.linkedSubmissionIds || [], user);
     // Already-released CO: newly linked submissions follow its released state.
     if (co.invoiceReleased === "Yes") await releaseLinkedRecordInvoices(co);
 
@@ -282,21 +387,33 @@ router.delete("/:id", requireAuth, async (req, res) => {
   }
 });
 
-/** POST /api/change-orders/:id/approval — set approval to Pending/Approved/Rejected (admin/management only). */
+/**
+ * POST /api/change-orders/:id/approval — set approval to Pending/Approved/Rejected.
+ * A team lead's CO (requiresApproval) can only be decided by an admin or one of
+ * its team's management approvers — management users with that team lead in
+ * their allowed teams, or with no teams assigned at all (see
+ * userHelpers.getChangeOrderApprovers). Other COs: any admin/management.
+ */
 router.post("/:id/approval", requireRole("admin", "management"), async (req, res) => {
+  const user = req.session.username;
   const approval = String(req.body.approval || "").trim();
-  if (!["Pending", "Approved", "Rejected"].includes(approval)) {
+  if (!APPROVAL_VALUES.includes(approval)) {
     return res.status(400).json({ ok: false, error: "Invalid approval value." });
   }
   try {
-    const co = await ChangeOrder.findByIdAndUpdate(
-      req.params.id,
-      { approval, updatedBy: req.session.username, updatedAt: new Date() },
-      { new: true }
-    );
-    if (!co) return res.status(404).json({ ok: false, error: "Change order not found." });
-    writeLog("CHANGE-ORDER-APPROVAL", `co='${co.coNumber}' approval='${approval}'`, req.session.username);
-    res.json({ ok: true, approval });
+    const existing = await ChangeOrder.findById(req.params.id);
+    if (!existing) return res.status(404).json({ ok: false, error: "Change order not found." });
+    if (existing.requiresApproval && !(await canApproveChangeOrder(user, req.session.role, existing.team))) {
+      return res.status(403).json({ ok: false, error: "You're not an approver for this team's change orders." });
+    }
+
+    existing.set({ approval, approvalBy: user, approvalAt: new Date(), updatedBy: user, updatedAt: new Date() });
+    const co = await existing.save();
+    if (co.requiresApproval && approval === "Approved") {
+      await moveBillableSubmissionsToCo(co, co.linkedSubmissionIds || [], user);
+    }
+    writeLog("CHANGE-ORDER-APPROVAL", `co='${co.coNumber}' approval='${approval}'`, user, co.project);
+    res.json({ ok: true, approval, change_order: toRow(co) });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
@@ -371,6 +488,9 @@ router.post("/:id/invoice-released", requireAuth, async (req, res) => {
     const existing = await ChangeOrder.findById(req.params.id);
     if (!existing) return res.status(404).json({ ok: false, error: "Change order not found." });
 
+    if (value === "Yes" && isAwaitingApproval(existing)) {
+      return res.status(400).json({ ok: false, error: AWAITING_APPROVAL_ERROR });
+    }
     if (value === "Yes") {
       const incomplete = await getIncompleteLinkedSubmissions(existing);
       if (incomplete.length) {
@@ -427,6 +547,11 @@ router.post("/:id/invoice-released", requireAuth, async (req, res) => {
 router.post("/:id/release-to-finance", requireRole("admin", "management"), async (req, res) => {
   const released = !!req.body.released;
   try {
+    if (released) {
+      const existing = await ChangeOrder.findById(req.params.id).select("requiresApproval approval").lean();
+      if (!existing) return res.status(404).json({ ok: false, error: "Change order not found." });
+      if (isAwaitingApproval(existing)) return res.status(400).json({ ok: false, error: AWAITING_APPROVAL_ERROR });
+    }
     const update = {
       releasedToFinance: released,
       releasedToFinanceBy: req.session.username,

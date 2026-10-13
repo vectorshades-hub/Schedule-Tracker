@@ -8,7 +8,6 @@ const { parse } = require("csv-parse/sync");
 const ExcelJS = require("exceljs");
 const { Record, User, Team, Project, Client, ActivityLog, Notification, CompletedLog, RequestLog, EditingLog } = require("../models");
 const { ensureAtLeast } = require("../models/Counter");
-const { ensureBillableChangeOrder } = require("./changeOrderAuto");
 
 function splitCsvList(s) {
   return String(s || "")
@@ -167,8 +166,8 @@ const HANDLERS = {
     };
   },
 
-  records: async (rows, uploadedBy) => {
-    let inserted = 0, updated = 0, skipped = 0, changeOrdersCreated = 0;
+  records: async (rows) => {
+    let inserted = 0, updated = 0, skipped = 0;
     const errors = [];
     let maxLegacyId = 0;
     for (const row of rows) {
@@ -211,29 +210,12 @@ const HANDLERS = {
         );
         if (result.upsertedCount) inserted++;
         else updated++;
-
-        // Same auto-CO behavior as the normal Add/Edit Record form — a
-        // billable submission gets its own Change Order, skipped if one
-        // already exists for this legacyId (see ensureBillableChangeOrder).
-        if (toYesNo(billable) === "Yes") {
-          const created = await ensureBillableChangeOrder(
-            { legacyId, project: project || "", team: team || "", subDate: parseFlexibleDateTime(subDate), submissionName: submissionName || "", billable: "Yes" },
-            uploadedBy || createdBy || ""
-          );
-          if (created) changeOrdersCreated++;
-        }
       } catch (e) {
         errors.push(`legacyId ${legacyId}: ${e.message}`);
       }
     }
     if (maxLegacyId > 0) await ensureAtLeast("recordId", maxLegacyId);
-    return {
-      inserted,
-      updated,
-      skipped,
-      errors,
-      note: changeOrdersCreated ? `Auto-created ${changeOrdersCreated} Change Order(s) for billable record(s).` : undefined,
-    };
+    return { inserted, updated, skipped, errors };
   },
 
   hold_data: async (rows) => {

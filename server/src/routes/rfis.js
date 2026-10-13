@@ -1,5 +1,5 @@
 const createSafeRouter = require("../utils/safeRouter");
-const { Rfi } = require("../models");
+const { Rfi, Record } = require("../models");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const { writeLog } = require("../services/logging");
 const statusEngine = require("../services/statusEngine");
@@ -89,6 +89,64 @@ router.get("/", requireAuth, async (req, res) => {
   if (!project) return res.json({ rfis: [] });
   const rows = await Rfi.find({ project }).sort({ createdAt: -1 }).lean();
   res.json({ rfis: rows.map(toRow) });
+});
+
+// An RFI still waiting on a response this many days after it was sent shows
+// up in the reminders list (and fires a browser notification — see NotificationBell).
+const REMINDER_AFTER_DAYS = 5;
+
+/**
+ * A team lead's "own" RFIs: ones linked to a submission that's theirs (team
+ * matches them, same rule as recordVisibility.teamMatch, or they created it)
+ * — or, for RFIs with no linked submissions, ones on a project where they
+ * have any submission. Returns a predicate over Rfi docs.
+ */
+async function teamLeadRfiFilter(username) {
+  const esc = username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const own = await Record.find({
+    $or: [{ team: new RegExp(`^${esc}($|[( ])`, "i") }, { createdBy: new RegExp(`^${esc}$`, "i") }],
+  })
+    .select("legacyId project")
+    .lean();
+  const ownIds = new Set(own.map((r) => r.legacyId));
+  const ownProjects = new Set(own.map((r) => r.project));
+  return (rfi) =>
+    rfi.linkedSubmissionIds && rfi.linkedSubmissionIds.length
+      ? rfi.linkedSubmissionIds.some((id) => ownIds.has(id))
+      : ownProjects.has(rfi.project);
+}
+
+/**
+ * GET /api/rfis/reminders — every RFI that's still not Returned (Pending or
+ * Overdue) more than REMINDER_AFTER_DAYS days after its date (falls back to
+ * createdAt when no date was entered). Oldest first. Admin/management see
+ * all projects; team leads only their own (see teamLeadRfiFilter).
+ */
+router.get("/reminders", requireRole("admin", "management", "team_lead"), async (req, res) => {
+  const today = statusEngine.todayUTC();
+  const cutoff = new Date(today.getTime() - REMINDER_AFTER_DAYS * 86400000);
+  const candidates = await Rfi.find({
+    $or: [{ date: { $lt: cutoff } }, { date: null, createdAt: { $lt: cutoff } }],
+  }).lean();
+  const isVisible =
+    req.session.role === "team_lead" ? await teamLeadRfiFilter(req.session.username || "") : () => true;
+
+  const reminders = candidates
+    .filter(isVisible)
+    .filter((rfi) => computeRfiStatus(rfi) !== "Returned")
+    .map((rfi) => {
+      const row = toRow(rfi);
+      const sent = statusEngine.parseDate(rfi.date || rfi.createdAt);
+      return {
+        ...row,
+        sent_date: statusEngine.fmtDateOnlyISO(sent),
+        days_pending: statusEngine.daysBetween(today, sent),
+        open_questions: row.questions.filter((q) => !q.response_received_date).length,
+      };
+    })
+    .sort((a, b) => b.days_pending - a.days_pending);
+
+  res.json({ threshold_days: REMINDER_AFTER_DAYS, reminders });
 });
 
 /** POST /api/rfis — create an RFI/Clarification request (admin/management only). */

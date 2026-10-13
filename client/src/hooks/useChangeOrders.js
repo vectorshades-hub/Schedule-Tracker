@@ -10,6 +10,16 @@ export function useChangeOrders(project) {
   });
 }
 
+/** Team-lead COs pending approval past the reminder threshold (see
+ * changeOrders.js's GET /reminders). Keyed under "change-orders" so any CO
+ * mutation's invalidation refreshes it too. */
+export function useCoApprovalReminders() {
+  return useQuery({
+    queryKey: ["change-orders", { reminders: true }],
+    queryFn: () => api.get("/change-orders/reminders"),
+  });
+}
+
 export function useCreateChangeOrder() {
   const qc = useQueryClient();
   return useMutation({

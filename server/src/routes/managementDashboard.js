@@ -57,6 +57,7 @@ function toRow(co, clientByProject) {
     notes: co.notes || "",
     hours: co.hours ?? 0,
     approval: co.approval || "Pending",
+    requires_approval: !!co.requiresApproval,
     billed: !!co.billed,
     invoice_released: co.invoiceReleased || "",
     invoice_released_reason: co.invoiceReleasedReason || "",

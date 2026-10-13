@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../lib/AuthContext";
 import NotificationBell from "./NotificationBell";
@@ -10,7 +10,55 @@ import { api, ApiError } from "../lib/api";
 import { ROLE_BADGE_STYLES } from "../lib/statusStyles";
 import { useToast } from "../lib/ToastContext";
 
-const EMPTY_USER_FORM = { username: "", password: "", confirm_password: "", role: "team_lead", allowed_teams_chk: [], cross_team: "0", linked_tls_chk: [], default_tl_radio: "", bday_month: "", bday_day: "" };
+/**
+ * Admin-only "⋮" overflow menu in the navbar — holds the less-used admin
+ * links (Users, Add User, Bulk Upload, Activity Log, Request Log) so the
+ * top bar stays on one line. Closes on outside click, Escape, or picking an item.
+ */
+function AdminMoreMenu({ onAddUser }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="st-more" ref={ref}>
+      <button
+        type="button"
+        className="st-more-btn"
+        aria-label="More admin options"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <i className="bi bi-three-dots-vertical" />
+      </button>
+      {open && (
+        <div className="st-more-menu" role="menu">
+          <a href="/users" role="menuitem"><i className="bi bi-people-fill" /> Users</a>
+          <a href="#" role="menuitem" onClick={(e) => { e.preventDefault(); setOpen(false); onAddUser(); }}>
+            <i className="bi bi-person-plus-fill" /> Add User
+          </a>
+          <a href="/bulk-upload" role="menuitem"><i className="bi bi-cloud-upload-fill" /> Bulk Upload</a>
+          <a href="/activity-log" role="menuitem"><i className="bi bi-clipboard-data-fill" /> Activity Log</a>
+          <a href="/request-log" role="menuitem"><i className="bi bi-hdd-network-fill" /> Request Log</a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const EMPTY_USER_FORM ={ username: "", password: "", confirm_password: "", role: "team_lead", allowed_teams_chk: [], cross_team: "0", linked_tls_chk: [], default_tl_radio: "", bday_month: "", bday_day: "" };
 
 /**
  * Persistent role-aware layout — the React equivalent of base.html's navbar +
@@ -104,14 +152,6 @@ export default function AppLayout({ children, allow }) {
             </span>
           </span>
 
-          {role === "admin" && (
-            <a href="#" onClick={(e) => { e.preventDefault(); setAddUserOpen(true); }}>
-              <i className="bi bi-person-plus-fill" /> Add User
-            </a>
-          )}
-          {role === "admin" && <a href="/users"><i className="bi bi-people-fill" /> Users</a>}
-          {role === "admin" && <a href="/bulk-upload"><i className="bi bi-cloud-upload-fill" /> Bulk Upload</a>}
-          {role === "admin" && <a href="/activity-log"><i className="bi bi-clipboard-data-fill" /> Activity Log</a>}
           {role === "admin" && <a href="/settings"><i className="bi bi-gear-fill" /> Settings</a>}
           {["admin", "management", "team_lead"].includes(role) && (
             <>
@@ -133,10 +173,10 @@ export default function AppLayout({ children, allow }) {
           {["admin", "finance"].includes(role) && (
             <a href="/finance-dashboard"><i className="bi bi-cash-coin" /> Finance Dashboard</a>
           )}
-          {role === "admin" && <a href="/request-log"><i className="bi bi-hdd-network-fill" /> Request Log</a>}
-
           <div className="ms-auto d-flex align-items-center gap-3">
             {["admin", "management"].includes(role) && <NotificationBell />}
+            {role === "team_lead" && <NotificationBell remindersOnly />}
+            {role === "admin" && <AdminMoreMenu onAddUser={() => setAddUserOpen(true)} />}
             <button className="btn btn-sm btn-outline-light" onClick={logout}>
               <i className="bi bi-box-arrow-right" /> Logout
             </button>

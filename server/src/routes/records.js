@@ -14,7 +14,6 @@ const {
 } = require("../services/userHelpers");
 const { writeLog, pushNotification, buildAddDetail, buildUpdateDetail, getUnseenCount } = require("../services/logging");
 const { archiveRecord } = require("../services/completedLogArchiver");
-const { ensureBillableChangeOrder } = require("../services/changeOrderAuto");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const upload = require("../middleware/upload");
 const { HOLD_IMAGES_DIR, saveUploadedFile, deleteHoldImage } = require("../utils/fileStorage");
@@ -354,8 +353,6 @@ router.post("/", requireAuth, upload.single("onhold_file"), async (req, res) => 
     }
     await Project.updateOne({ name: project }, { $set: projectReset });
 
-    await ensureBillableChangeOrder(record, user);
-
     writeLog("ADD", `ID=${legacyId} '${project}'/'${submissionName}' status=${status}`, user);
     pushNotification(
       "ADD",
@@ -485,7 +482,6 @@ router.put("/:id", requireAuth, upload.single("onhold_file"), async (req, res) =
     }
 
     await existing.save();
-    await ensureBillableChangeOrder(existing, user);
 
     const after = { project, submission_name: submissionName, status, remarks };
     writeLog("UPDATE", `ID=${recordId} '${project}' status=${status}`, user);
@@ -570,14 +566,8 @@ router.post("/:id/toggle-field", requireAuth, async (req, res) => {
   }
 
   try {
-    // findOneAndUpdate returns the PRE-update doc by default — `r.billable`
-    // below is still the old value, so ensureBillableChangeOrder is passed
-    // `value` (the new one) instead of trusting `r[dbField]`.
     const r = await Record.findOneAndUpdate({ legacyId: req.params.id }, { [dbField]: value });
     if (!r) return res.status(404).json({ ok: false, error: "Record not found" });
-    if (field === "billable") {
-      await ensureBillableChangeOrder({ ...r.toObject(), billable: value }, req.session.username);
-    }
     writeLog("FIELD-UPDATE", `ID=${req.params.id} ${field}='${value}'`, req.session.username);
     res.json({ ok: true, value });
   } catch (e) {

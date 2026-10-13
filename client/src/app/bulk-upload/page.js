@@ -116,7 +116,7 @@ export default function BulkUploadPage() {
         <ul className="small text-muted mb-0">
           <li>Files must be plain CSV with <strong>no header row</strong> — columns in the exact order shown above (matches a direct Postgres <code>COPY ... TO CSV</code> export).</li>
           <li><strong>Records</strong> and <strong>Users</strong> are upserted by their natural key (record ID / username) — safe to re-run.</li>
-          <li><strong>Records</strong>: set the <code>billable</code> column to <code>Yes</code>/<code>true</code>/<code>1</code> to auto-create a Change Order for that submission, exactly like the Add/Edit Record form does — re-running the upload won&apos;t create duplicates for a record that already has one.</li>
+          <li><strong>Records</strong>: the <code>billable</code> column accepts <code>Yes</code>/<code>true</code>/<code>1</code> (anything else is No). It only sets the record&apos;s Billable flag — Change Orders are not created automatically; add them from the Change Orders screen.</li>
           <li><strong>Records</strong>: <code>invoice_released</code> accepts <code>Yes</code>/<code>No</code> (or blank) and <code>percentage</code> accepts a whole number 0–100 — both map onto the same fields the Management/Records views already show. Note the column order: <code>percentage</code> comes before <code>billable</code>, which comes before <code>invoice_released</code>.</li>
           <li><strong>Teams / Projects / Clients</strong> are upserted by name.</li>
           <li><strong>Clients &amp; Projects</strong>: one row per project (<code>client, project</code>) — creates the client and project if new, and links the project to that client. Repeat the client name on multiple rows to give it several projects.</li>

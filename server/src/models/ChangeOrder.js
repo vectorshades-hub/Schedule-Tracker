@@ -20,6 +20,13 @@ const changeOrderSchema = new mongoose.Schema({
   notes: { type: String, default: "" },
   hours: { type: Number, default: 0 },
   approval: { type: String, default: "Pending" }, // "Pending" | "Approved" | "Rejected"
+  // Set on COs raised by a team lead — those must be Approved by an admin or
+  // one of the team's management approvers (userHelpers.getChangeOrderApprovers)
+  // before they can be released to finance / invoiced. COs created by
+  // admin/management never need it, so legacy rows keep working unchanged.
+  requiresApproval: { type: Boolean, default: false },
+  approvalBy: { type: String, default: "" }, // who last approved/rejected
+  approvalAt: { type: Date, default: null },
   billed: { type: Boolean, default: false },
   createdBy: { type: String, default: "" },
   createdAt: { type: Date, default: Date.now },
@@ -27,11 +34,10 @@ const changeOrderSchema = new mongoose.Schema({
   // submission detail page's Activity panel ("Change Order updated").
   updatedBy: { type: String, default: "" },
   updatedAt: { type: Date, default: null },
-  // Set only on a CO auto-added because its source submission was marked
-  // Billable (Record.legacyId — see routes/records.js's ensureBillableChangeOrder) —
-  // null for every manually-created CO. Lets that auto-add stay idempotent:
-  // toggling Billable off and back on, or re-saving an already-billable
-  // submission, checks this before adding a second CO for the same submission.
+  // Legacy: set only on COs that were auto-added when their source submission
+  // was marked Billable (Record.legacyId). That auto-add has been removed, so
+  // new COs always leave this null — kept so those older COs still resolve
+  // their source submission (linking, invoice release, completion checks).
   sourceRecordId: { type: Number, default: null, index: true },
   // Manually-linked submissions (Record.legacyId values), picked on the
   // create/edit form — separate from `sourceRecordId` above (the single

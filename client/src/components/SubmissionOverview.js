@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../lib/AuthContext";
 import { useToast } from "../lib/ToastContext";
 import { api, ApiError, API_URL } from "../lib/api";
@@ -9,6 +9,7 @@ import {
   useCreateChangeOrder,
   useUpdateChangeOrder,
   useDeleteChangeOrder,
+  useSetChangeOrderApproval,
 } from "../hooks/useChangeOrders";
 import {
   useRfis,
@@ -219,6 +220,13 @@ export default function SubmissionOverview({
   // regardless of the separate can_update_records setting (which only
   // governs editing Submission Details rows).
   const canEditCoRfi = canEdit && user?.role !== "user";
+  // Team leads can raise COs (they go for management approval) but only edit
+  // their own, and only until approved — mirrors PUT /api/change-orders/:id.
+  // Not gated by can_update_records, which only governs Submission Details rows.
+  const isTeamLead = user?.role === "team_lead";
+  const canCreateCo = canEditCoRfi || isTeamLead;
+  const canEditCo = (co) =>
+    isTeamLead ? co.created_by === user?.username && co.approval !== "Approved" : canEditCoRfi;
   const [coModalOpen, setCoModalOpen] = useState(false);
   const [editingCO, setEditingCO] = useState(null); // the CO row being edited, or null (create mode)
   const [deleteTargetCO, setDeleteTargetCO] = useState(null);
@@ -237,6 +245,7 @@ export default function SubmissionOverview({
   const createCO = useCreateChangeOrder();
   const updateCO = useUpdateChangeOrder();
   const deleteCO = useDeleteChangeOrder();
+  const setCoApproval = useSetChangeOrderApproval();
   const { data: coDashboardConfig } = useDashboardConfig({});
   const { data: rfiData, refetch: refetchRfis } = useRfis(projectName);
   const createRfi = useCreateRfi();
@@ -245,6 +254,25 @@ export default function SubmissionOverview({
   const setRfiResponse = useSetRfiResponseReceived();
   const setRfiQuestionResponse = useSetRfiQuestionResponseReceived();
   const { data: deletedActivityData } = useProjectActivity(projectName);
+
+  // Pending-RFI reminders (notifications page / browser notification) link
+  // here as /projects/<name>#rfi-section — the section only exists once the
+  // data has loaded, so the browser's own anchor jump misses it; do it once here.
+  const scrolledToRfis = useRef(false);
+  useEffect(() => {
+    if (!rfiData || scrolledToRfis.current || window.location.hash !== "#rfi-section") return;
+    scrolledToRfis.current = true;
+    document.getElementById("rfi-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [rfiData]);
+
+  // Same for CO-approval reminders, which link as #change-order-section.
+  const scrolledToCos = useRef(false);
+  useEffect(() => {
+    if (!coData || scrolledToCos.current || window.location.hash !== "#change-order-section") return;
+    scrolledToCos.current = true;
+    document.getElementById("change-order-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [coData]);
+
   const lifecycle = computeProjectLifecycle(records);
   if (!lifecycle) return null;
   const { stages, currentIndex, avgPct } = lifecycle;
@@ -329,6 +357,19 @@ export default function SubmissionOverview({
     }
   }
 
+  function confirmCoApproval(co, approval) {
+    const verb = approval === "Approved" ? "Approve" : "Reject";
+    requestConfirm(`${verb} Change Order`, `${verb} CO${co.co_number} (${co.change_type}) raised by ${co.created_by || "—"}?`, async () => {
+      try {
+        await setCoApproval.mutateAsync({ id: co.id, approval });
+        toast.success(`Change Order #${co.co_number} ${approval.toLowerCase()}.`);
+        refetchCOs();
+      } catch (e) {
+        toast.error(e instanceof ApiError ? e.message : "Failed to update approval.");
+      }
+    });
+  }
+
   // Approve/Reject, Billed, and RFI Response Received all go through this one
   // confirm step before actually calling the API — see `pendingAction` state
   // and the shared confirm Modal near the end of this component. `warning`
@@ -395,7 +436,12 @@ export default function SubmissionOverview({
     return true;
   });
   const filteredChangeOrders =
-    coFilter === "All" ? changeOrders : changeOrders.filter((co) => getChangeOrderStatus(co).key === coFilter);
+    coFilter === "All"
+      ? changeOrders
+      : coFilter === "awaiting_approval"
+        ? changeOrders.filter((co) => co.requires_approval && co.approval !== "Approved")
+        : changeOrders.filter((co) => getChangeOrderStatus(co).key === coFilter);
+  const awaitingApprovalCount = changeOrders.filter((co) => co.requires_approval && co.approval !== "Approved").length;
 
   function exportRfisCSV() {
     const headers = ["Type", "RFI Number", "Title", "Questions", "RFI Date", "Expected Response", "Actual Return", "Status", "Created By"];
@@ -791,7 +837,7 @@ export default function SubmissionOverview({
                     >
                       <i className="bi bi-download" /> Export
                     </button>
-                    {canEditCoRfi && (
+                    {canCreateCo && (
                       <button type="button" className="btn btn-sm btn-success" onClick={openCreateCO}>
                         <i className="bi bi-plus-lg" /> Add CO
                       </button>
@@ -819,6 +865,15 @@ export default function SubmissionOverview({
                       <i className={`bi ${s.icon}`} /> {s.label}
                     </button>
                   ))}
+                  {awaitingApprovalCount > 0 && (
+                    <button
+                      type="button"
+                      className={`rfi-filter-pill${coFilter === "awaiting_approval" ? " active" : ""}`}
+                      onClick={() => setCoFilter("awaiting_approval")}
+                    >
+                      <i className="bi bi-shield-exclamation" /> Awaiting Approval ({awaitingApprovalCount})
+                    </button>
+                  )}
                 </div>
               )}
               <div className="detail-panel-body">
@@ -828,10 +883,11 @@ export default function SubmissionOverview({
                       <ChangeOrderCard
                         key={co.id}
                         co={co}
-                        canEdit={canEditCoRfi}
+                        canEdit={canEditCo(co)}
                         canDelete={canDeleteChangeOrders}
                         onEdit={openEditCO}
                         onDelete={setDeleteTargetCO}
+                        onApproval={confirmCoApproval}
                         showTotal={showCoTotal}
                         submissionOptions={records}
                       />
@@ -840,14 +896,18 @@ export default function SubmissionOverview({
                 ) : changeOrders.length ? (
                   <div className="empty-state">
                     <i className="bi bi-funnel" />
-                    <div>No {(CHANGE_ORDER_STATUSES.find((s) => s.key === coFilter)?.label || coFilter).toLowerCase()} change orders</div>
+                    <div>
+                      {coFilter === "awaiting_approval"
+                        ? "No change orders awaiting approval"
+                        : `No ${(CHANGE_ORDER_STATUSES.find((s) => s.key === coFilter)?.label || coFilter).toLowerCase()} change orders`}
+                    </div>
                     <div className="text-muted small">Try a different filter</div>
                   </div>
                 ) : (
                   <div className="empty-state">
                     <i className="bi bi-cash-stack" />
                     <div>No change orders yet</div>
-                    {canEditCoRfi && <div className="text-muted small">Click "+ Add CO" to create one</div>}
+                    {canCreateCo && <div className="text-muted small">Click "+ Add CO" to create one</div>}
                   </div>
                 )}
               </div>
@@ -1101,6 +1161,7 @@ export default function SubmissionOverview({
         onSubmit={submitChangeOrder}
         submitting={editingCO ? updateCO.isPending : createCO.isPending}
         initial={editingCO}
+        needsApproval={isTeamLead}
         submissionOptions={records}
       />
 

@@ -10,6 +10,16 @@ export function useRfis(project) {
   });
 }
 
+/** RFIs across all projects still unanswered more than N days after being
+ * sent (see rfis.js's GET /reminders). Keyed under "rfis" so every RFI
+ * mutation below (which invalidates ["rfis"]) refreshes it too. */
+export function useRfiReminders() {
+  return useQuery({
+    queryKey: ["rfis", { reminders: true }],
+    queryFn: () => api.get("/rfis/reminders"),
+  });
+}
+
 export function useCreateRfi() {
   const qc = useQueryClient();
   return useMutation({

@@ -22,7 +22,7 @@ const EMPTY_FORM = { co_number: "", team: "", date: todayISO(), change_type: "",
  *
  * Doubles as the Edit modal — pass `initial` (a change_orders row) to
  * pre-fill the form and switch the header/submit copy; omit it to create. */
-export default function CreateChangeOrderModal({ open, onClose, onSubmit, submitting, initial, submissionOptions = [] }) {
+export default function CreateChangeOrderModal({ open, onClose, onSubmit, submitting, initial, submissionOptions = [], needsApproval = false }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [linkQuery, setLinkQuery] = useState("");
   const [linkOpen, setLinkOpen] = useState(false);
@@ -72,6 +72,7 @@ export default function CreateChangeOrderModal({ open, onClose, onSubmit, submit
   const linkQueryLower = linkQuery.trim().toLowerCase();
   const linkMatches = submissionOptions
     .filter((s) => !linkedIds.includes(String(s.id)))
+    .filter((s) => !String(s.tag || "").startsWith("completed")) // completed / completed_overdue
     .filter((s) => !linkQueryLower || String(s.id).toLowerCase().includes(linkQueryLower) || (s.submission_name || "").toLowerCase().includes(linkQueryLower))
     .slice(0, 8);
 
@@ -96,6 +97,7 @@ export default function CreateChangeOrderModal({ open, onClose, onSubmit, submit
             <div className="co-modal-title">{isEdit ? "Edit Change Order" : "Create Change Order"}</div>
             <div className="co-modal-subtitle">
               {isEdit ? `Update CO${initial.co_number}` : "Add a new CO to this project"}
+              {needsApproval && " — it will be sent to management for approval"}
             </div>
           </div>
           <button type="button" className="co-modal-close" onClick={onClose} aria-label="Close">
@@ -170,6 +172,9 @@ export default function CreateChangeOrderModal({ open, onClose, onSubmit, submit
                       setLinkOpen(true);
                     }}
                     onFocus={() => setLinkOpen(true)}
+                    // The input keeps focus after picking a submission, so onFocus
+                    // won't fire again — reopen the list on any click as well.
+                    onClick={() => setLinkOpen(true)}
                   />
                   {linkOpen && linkMatches.length > 0 && (
                     <div className="sd-list">
@@ -273,7 +278,7 @@ export default function CreateChangeOrderModal({ open, onClose, onSubmit, submit
               Cancel
             </button>
             <button type="submit" className="btn btn-success" disabled={submitting}>
-              {isEdit ? "Save Changes" : "Create CO"}
+              {needsApproval ? "Submit for Approval" : isEdit ? "Save Changes" : "Create CO"}
             </button>
           </div>
         </form>

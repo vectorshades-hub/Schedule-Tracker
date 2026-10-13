@@ -48,7 +48,35 @@ async function getAllTeamleadsInManagement(mgmtUsername) {
   return allTls.filter((t) => !allowed.length || allowed.includes(t));
 }
 
+/**
+ * Management users who can approve a Change Order raised for `team` (a
+ * team-lead username): those with that team in their allowedTeams, plus
+ * those with no allowedTeams at all (they oversee every team). Admins can
+ * always approve too, but aren't listed here — see canApproveChangeOrder.
+ * Unlike getManagementUsersForTeamlead this ignores `crossTeam`, which only
+ * governs visibility.
+ */
+async function getChangeOrderApprovers(team) {
+  const teamLower = String(team || "").trim().toLowerCase();
+  const rows = await User.find({ role: "management" }).sort({ username: 1 }).select("username allowedTeams").lean();
+  return rows
+    .filter((row) => {
+      const allowed = row.allowedTeams || [];
+      if (!allowed.length) return true;
+      return !!teamLower && allowed.some((t) => String(t).trim().toLowerCase() === teamLower);
+    })
+    .map((row) => row.username);
+}
+
+async function canApproveChangeOrder(username, role, team) {
+  if (role === "admin") return true;
+  if (role !== "management") return false;
+  return (await getChangeOrderApprovers(team)).includes(username);
+}
+
 module.exports = {
+  getChangeOrderApprovers,
+  canApproveChangeOrder,
   getTeamsFromUsers,
   getAllowedTeamsForUser,
   getLinkedTls,
