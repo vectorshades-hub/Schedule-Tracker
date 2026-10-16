@@ -12,6 +12,65 @@ const rfiQuestionSchema = new mongoose.Schema(
   { _id: true }
 );
 
+// One cloud markup on an uploaded PDF, tying a region of a page to one
+// question. Coordinates are fractions (0–1) of the page's width/height, so
+// they stay put at any zoom level. labelX/labelY anchor the callout label.
+const rfiMarkSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    questionId: { type: String, required: true },
+    page: { type: Number, required: true }, // 1-based
+    x: Number,
+    y: Number,
+    w: Number,
+    h: Number,
+    labelX: Number,
+    labelY: Number,
+    // Dragged leader-line geometry, both optional: lineEnd* is where the line
+    // meets the box as a fraction of the box (overrides style.boxAnchor);
+    // lineBend* is an elbow point as a fraction of the page.
+    lineEndX: { type: Number, default: undefined },
+    lineEndY: { type: Number, default: undefined },
+    lineBendX: { type: Number, default: undefined },
+    lineBendY: { type: Number, default: undefined },
+    // Appearance overrides from the workspace's Style panel (validated by
+    // rfis.js's parseMarkStyle); missing keys fall back to the client default.
+    style: { type: mongoose.Schema.Types.Mixed, default: undefined },
+  },
+  { _id: false }
+);
+
+// An image pasted or dropped onto a page of a markup PDF. Same 0–1 page
+// fractions as marks; the file sits next to the PDFs in uploads/rfi_markups.
+// `locked` pins it in place (it can no longer be dragged or resized).
+const rfiMarkupImageSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    filename: { type: String, required: true },
+    page: { type: Number, required: true }, // 1-based
+    x: Number,
+    y: Number,
+    w: Number,
+    h: Number,
+    locked: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+// A PDF uploaded through the RFI "Mark Up" workspace, plus its marks. The
+// file itself lives in uploads/rfi_markups (see fileStorage.RFI_MARKUPS_DIR).
+const rfiMarkupDocSchema = new mongoose.Schema(
+  {
+    filename: { type: String, required: true },
+    originalName: { type: String, default: "" },
+    uploadedBy: { type: String, default: "" },
+    uploadedAt: { type: Date, default: Date.now },
+    marks: { type: [rfiMarkSchema], default: [] },
+    images: { type: [rfiMarkupImageSchema], default: [] },
+  },
+  { _id: true }
+);
+
 /**
  * RFI/Clarification requests — same project-level scoping convention as
  * ChangeOrder (see ChangeOrder.js): tied to `project`, not one specific
@@ -35,6 +94,7 @@ const rfiSchema = new mongoose.Schema({
   // to several submissions at once, picked on the create/edit form. Same
   // convention as ChangeOrder.linkedSubmissionIds.
   linkedSubmissionIds: { type: [Number], default: [] },
+  markupDocs: { type: [rfiMarkupDocSchema], default: [] },
 });
 
 module.exports = mongoose.model("Rfi", rfiSchema);

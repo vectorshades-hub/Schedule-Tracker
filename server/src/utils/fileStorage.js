@@ -11,9 +11,13 @@ const env = require("../config/env");
 const HOLD_IMAGES_DIR = path.join(env.uploadDir, "hold_images");
 const LEGACY_ONHOLD_DIR = path.join(env.uploadDir, "onhold_attachments");
 const PROJECT_IMAGES_DIR = path.join(env.uploadDir, "project_images");
+const RFI_MARKUPS_DIR = path.join(env.uploadDir, "rfi_markups");
+const ISSUE_ATTACHMENTS_DIR = path.join(env.uploadDir, "issue_attachments");
 
 fs.mkdirSync(HOLD_IMAGES_DIR, { recursive: true });
 fs.mkdirSync(PROJECT_IMAGES_DIR, { recursive: true });
+fs.mkdirSync(RFI_MARKUPS_DIR, { recursive: true });
+fs.mkdirSync(ISSUE_ATTACHMENTS_DIR, { recursive: true });
 fs.mkdirSync(env.backupDir, { recursive: true });
 
 // One-time migration: fold any files left over in the old onhold_attachments
@@ -95,9 +99,51 @@ function deleteProjectImage(filename) {
   }
 }
 
+function resolveRfiMarkupPath(filename) {
+  if (!filename) return null;
+  const safe = sanitizeFilename(filename);
+  const p = path.join(RFI_MARKUPS_DIR, safe);
+  return fs.existsSync(p) ? p : null;
+}
+
+/** Deletes an RFI markup PDF by filename, if it exists. Safe to call with an empty/unknown filename. */
+function deleteRfiMarkupFile(filename) {
+  const resolved = resolveRfiMarkupPath(filename);
+  if (!resolved) return;
+  try {
+    fs.unlinkSync(resolved);
+  } catch (e) {
+    console.error("[fileStorage] failed deleting", resolved, e.message);
+  }
+}
+
+function resolveIssueAttachmentPath(filename) {
+  if (!filename) return null;
+  const safe = sanitizeFilename(filename);
+  const p = path.join(ISSUE_ATTACHMENTS_DIR, safe);
+  return fs.existsSync(p) ? p : null;
+}
+
+/** Deletes an issue attachment by filename, if it exists. Safe to call with an empty/unknown filename. */
+function deleteIssueAttachmentFile(filename) {
+  const resolved = resolveIssueAttachmentPath(filename);
+  if (!resolved) return;
+  try {
+    fs.unlinkSync(resolved);
+  } catch (e) {
+    console.error("[fileStorage] failed deleting", resolved, e.message);
+  }
+}
+
 module.exports = {
   HOLD_IMAGES_DIR,
   PROJECT_IMAGES_DIR,
+  RFI_MARKUPS_DIR,
+  ISSUE_ATTACHMENTS_DIR,
+  resolveIssueAttachmentPath,
+  deleteIssueAttachmentFile,
+  resolveRfiMarkupPath,
+  deleteRfiMarkupFile,
   sanitizeFilename,
   saveUploadedFile,
   resolveHoldImagePath,

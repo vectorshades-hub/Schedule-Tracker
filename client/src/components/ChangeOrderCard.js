@@ -58,7 +58,7 @@ export default function ChangeOrderCard({ co, canEdit, canDelete, onEdit, onDele
               <i className="bi bi-check-lg" /> Approve
             </button>
           )}
-          {showApprovalButtons && co.approval !== "Rejected" && (
+          {showApprovalButtons && co.approval !== "Rejected" && co.approval !== "Approved" && (
             <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => onApproval(co, "Rejected")}>
               <i className="bi bi-x-lg" /> Reject
             </button>

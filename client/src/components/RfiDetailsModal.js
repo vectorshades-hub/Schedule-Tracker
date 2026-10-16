@@ -1,5 +1,10 @@
 "use client";
+import { useState } from "react";
 import StatusBadge from "./StatusBadge";
+import RfiMarkupWorkspace from "./RfiMarkupWorkspace";
+import { api } from "../lib/api";
+import { useToast } from "../lib/ToastContext";
+import { downloadRfiMarkup } from "../lib/rfiMarkupExport";
 
 const STATUS_ICON = {
   Pending: "bi-hourglass-split",
@@ -29,7 +34,23 @@ export default function RfiDetailsModal({
   onSetQuestionResponseReceived,
   submissionOptions = [],
 }) {
+  const toast = useToast();
+  const [markupOpen, setMarkupOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   if (!open || !rfi) return null;
+
+  /** Downloads every marked-up PDF of this RFI, with its marks drawn in, as one file. */
+  async function handleDownloadMarkup() {
+    setDownloading(true);
+    try {
+      const res = await api.get(`/rfis/${rfi.id}/markups`);
+      await downloadRfiMarkup(rfi, res.docs || []);
+    } catch (e) {
+      toast.error(`Download failed: ${e.message}`);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   const questions = rfi.questions || [];
   const receivedCount = questions.filter((q) => q.response_received_date).length;
@@ -193,12 +214,31 @@ export default function RfiDetailsModal({
                 <i className="bi bi-pencil" /> Edit
               </button>
             )}
+            {(canEdit || rfi.markup_doc_count > 0) && (
+              <button type="button" className="btn btn-sm btn-outline-danger rfi-markup-btn" onClick={() => setMarkupOpen(true)}>
+                <i className="bi bi-pencil-square" /> Mark Up
+                {rfi.markup_doc_count > 0 && <span className="rfi-markup-btn-count">{rfi.markup_doc_count}</span>}
+              </button>
+            )}
+            {rfi.markup_doc_count > 0 && (
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-primary"
+                onClick={handleDownloadMarkup}
+                disabled={downloading}
+                title="Download the marked-up PDF"
+              >
+                {downloading ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-download" />} Download Markup
+              </button>
+            )}
           </div>
           <button type="button" className="btn btn-secondary" onClick={onClose}>
             Close
           </button>
         </div>
       </div>
+
+      <RfiMarkupWorkspace open={markupOpen} onClose={() => setMarkupOpen(false)} rfi={rfi} canEdit={canEdit} />
     </div>
   );
 }

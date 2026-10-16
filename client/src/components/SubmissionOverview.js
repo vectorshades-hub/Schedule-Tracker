@@ -19,6 +19,7 @@ import {
   useSetRfiResponseReceived,
   useSetRfiQuestionResponseReceived,
 } from "../hooks/useRfis";
+import { useBfas, useCreateBfa, useUpdateBfa, useDeleteBfa } from "../hooks/useBfas";
 import { useProjectActivity } from "../hooks/useActivityLog";
 import {
   computeProjectLifecycle,
@@ -37,8 +38,9 @@ import Modal from "./Modal";
 import CreateChangeOrderModal from "./CreateChangeOrderModal";
 import ChangeOrderCard from "./ChangeOrderCard";
 import CreateRfiModal from "./CreateRfiModal";
-import RfiCard from "./RfiCard";
+import RfiCard, { copyText, unansweredRfisEmailText } from "./RfiCard";
 import RfiDetailsModal from "./RfiDetailsModal";
+import CreateBfaModal from "./CreateBfaModal";
 import ImageLightboxModal from "./ImageLightboxModal";
 
 /** A color-coded icon + title(+count)/subtitle + optional action buttons —
@@ -227,6 +229,10 @@ export default function SubmissionOverview({
   const canCreateCo = canEditCoRfi || isTeamLead;
   const canEditCo = (co) =>
     isTeamLead ? co.created_by === user?.username && co.approval !== "Approved" : canEditCoRfi;
+  // Admin, management and team leads can create/edit RFIs, toggle responses and
+  // edit markups — mirrors RFI_EDIT_ROLES in server/src/routes/rfis.js.
+  // Not gated by can_update_records, same as canCreateCo.
+  const canEditRfi = ["admin", "management", "team_lead"].includes(user?.role);
   const [coModalOpen, setCoModalOpen] = useState(false);
   const [editingCO, setEditingCO] = useState(null); // the CO row being edited, or null (create mode)
   const [deleteTargetCO, setDeleteTargetCO] = useState(null);
@@ -235,6 +241,8 @@ export default function SubmissionOverview({
   const [deleteTargetRfi, setDeleteTargetRfi] = useState(null);
   const [viewingRfiId, setViewingRfiId] = useState(null); // id of the RFI shown in RfiDetailsModal, or null
   const [rfiFilter, setRfiFilter] = useState("All"); // "All" | "Pending" | "Overdue" | "Returned"
+  const [bfaModalOpen, setBfaModalOpen] = useState(false);
+  const [editingBfa, setEditingBfa] = useState(null); // the BFA row being edited, or null (create mode)
   const [coFilter, setCoFilter] = useState("All"); // "All" or a CHANGE_ORDER_STATUSES key
   const [subTypeFilter, setSubTypeFilter] = useState(""); // "" (all) or a submission_type
   const [subCompletedFilter, setSubCompletedFilter] = useState(""); // "" (all) | "Completed" | "Not Completed"
@@ -253,6 +261,10 @@ export default function SubmissionOverview({
   const deleteRfi = useDeleteRfi();
   const setRfiResponse = useSetRfiResponseReceived();
   const setRfiQuestionResponse = useSetRfiQuestionResponseReceived();
+  const { data: bfaData } = useBfas(projectName);
+  const createBfa = useCreateBfa();
+  const updateBfa = useUpdateBfa();
+  const deleteBfa = useDeleteBfa();
   const { data: deletedActivityData } = useProjectActivity(projectName);
 
   // Pending-RFI reminders (notifications page / browser notification) link
@@ -443,6 +455,16 @@ export default function SubmissionOverview({
         : changeOrders.filter((co) => getChangeOrderStatus(co).key === coFilter);
   const awaitingApprovalCount = changeOrders.filter((co) => co.requires_approval && co.approval !== "Approved").length;
 
+  async function copyUnansweredRfisEmail() {
+    const text = unansweredRfisEmailText(rfis);
+    if (!text) {
+      toast.success("No unanswered RFI questions — nothing to copy.");
+      return;
+    }
+    if (await copyText(text)) toast.success("Email with all unanswered RFI questions copied.");
+    else toast.error("Could not copy to clipboard.");
+  }
+
   function exportRfisCSV() {
     const headers = ["Type", "RFI Number", "Title", "Questions", "RFI Date", "Expected Response", "Actual Return", "Status", "Created By"];
     const rows = rfis.map((r) => [
@@ -540,6 +562,77 @@ export default function SubmissionOverview({
     );
   }
 
+  const bfas = bfaData?.bfas || [];
+
+  function openCreateBfa() {
+    setEditingBfa(null);
+    setBfaModalOpen(true);
+  }
+
+  function openEditBfa(bfa) {
+    setEditingBfa(bfa);
+    setBfaModalOpen(true);
+  }
+
+  async function submitBfa(form) {
+    const payload = {
+      project: projectName,
+      tr_number: form.tr_number,
+      submission_id: form.submission_id,
+      submitted_date: form.submitted_date,
+      description: form.description,
+      days_awaited_override: form.days_awaited_override,
+      status: form.status,
+    };
+    try {
+      const res = editingBfa
+        ? await updateBfa.mutateAsync({ id: editingBfa.id, data: payload })
+        : await createBfa.mutateAsync(payload);
+      toast.success(res.message || `BFA ${editingBfa ? "updated" : "added"}.`);
+      setBfaModalOpen(false);
+      setEditingBfa(null);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Failed to save BFA.");
+    }
+  }
+
+  function confirmToggleBfaStatus(bfa) {
+    const next = bfa.status === "Yes" ? "No" : "Yes";
+    const label = [bfa.tr_number && `TR# ${bfa.tr_number}`, bfa.submission_name].filter(Boolean).join(" – ") || `#${bfa.submission_id}`;
+    requestConfirm("Change BFA status", `Change the status of ${label} to "${next}"?`, async () => {
+      try {
+        // PUT takes the whole entry, so resend the row as-is with the new status.
+        await updateBfa.mutateAsync({
+          id: bfa.id,
+          data: {
+            project: projectName,
+            tr_number: bfa.tr_number,
+            submission_id: bfa.submission_id,
+            submitted_date: bfa.submitted_date,
+            description: bfa.description,
+            days_awaited_override: bfa.days_awaited_override,
+            status: next,
+          },
+        });
+        toast.success(`Status set to "${next}".`);
+      } catch (e) {
+        toast.error(e instanceof ApiError ? e.message : "Failed to update BFA status.");
+      }
+    });
+  }
+
+  function confirmDeleteBfa(bfa) {
+    const label = [bfa.tr_number && `TR# ${bfa.tr_number}`, bfa.submission_name].filter(Boolean).join(" – ") || `#${bfa.submission_id}`;
+    requestConfirm("Delete BFA", `Delete the BFA entry for ${label}?`, async () => {
+      try {
+        const res = await deleteBfa.mutateAsync({ id: bfa.id });
+        toast.success(res.message || "BFA deleted.");
+      } catch (e) {
+        toast.error(e instanceof ApiError ? e.message : "Failed to delete BFA.");
+      }
+    });
+  }
+
   // Requires every record already completed (button is disabled otherwise —
   // see submissionCompleted below); the server re-checks this too. One-way
   // once confirmed here, unless a fresh submission is later added to the
@@ -627,7 +720,12 @@ export default function SubmissionOverview({
             </div>
           </div>
           <div className="lifecycle-actions">
-            {canEditCoRfi && (
+            {canEditRfi && (
+              <button type="button" className="btn btn-sm btn-outline-bfa" onClick={openCreateBfa}>
+                <i className="bi bi-send-check" /> BFA
+              </button>
+            )}
+            {canEditRfi && (
               <button type="button" className="btn btn-sm btn-outline-warning" onClick={openCreateRfi}>
                 <i className="bi bi-file-earmark-text" /> RFI / Clarification
               </button>
@@ -819,6 +917,88 @@ export default function SubmissionOverview({
             </div>
           </div>
 
+          <div className="detail-panel" id="bfa-section">
+            <PanelHeader
+              icon="bi-send-check-fill"
+              color="teal"
+              title="BFA Tracking"
+              subtitle="Transmittals awaiting return from the customer"
+              count={bfas.length}
+              actions={
+                canEditRfi && (
+                  <button type="button" className="btn btn-sm btn-bfa" onClick={openCreateBfa}>
+                    <i className="bi bi-plus-lg" /> Add
+                  </button>
+                )
+              }
+            />
+            <div className="detail-panel-body">
+              {bfas.length ? (
+                <div className="table-responsive">
+                  <table className="table table-sm align-middle bfa-table mb-0">
+                    <thead>
+                      <tr>
+                        <th>TR#</th>
+                        <th>Submission</th>
+                        <th>Submitted date</th>
+                        <th>Description</th>
+                        <th className="text-center">Days awaited</th>
+                        <th className="text-center">Status</th>
+                        {canEditRfi && <th />}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bfas.map((b) => (
+                        <tr key={b.id}>
+                          <td className="fw-semibold">{b.tr_number || <span className="text-muted">—</span>}</td>
+                          <td>{b.submission_name || `#${b.submission_id}`}</td>
+                          <td className="text-nowrap">{fmtDateLong(b.submitted_date) || "—"}</td>
+                          <td className="bfa-desc">{b.description || <span className="text-muted">—</span>}</td>
+                          <td className="text-center">
+                            {b.days_awaited ?? "—"}
+                            {b.days_awaited_override !== null && (
+                              <i className="bi bi-pencil-fill bfa-manual-icon" title="Set manually" />
+                            )}
+                          </td>
+                          <td className="text-center">
+                            <div className="form-check form-switch bfa-status-switch">
+                              <input
+                                type="checkbox"
+                                role="switch"
+                                className="form-check-input"
+                                checked={b.status === "Yes"}
+                                disabled={!canEditRfi || updateBfa.isPending}
+                                title={canEditRfi ? "Change status" : undefined}
+                                aria-label={`Status: ${b.status || "No"}`}
+                                onChange={() => confirmToggleBfaStatus(b)}
+                              />
+                            </div>
+                          </td>
+                          {canEditRfi && (
+                            <td className="text-end text-nowrap">
+                              <button type="button" className="btn btn-sm btn-warning me-1" title="Edit" aria-label="Edit" onClick={() => openEditBfa(b)}>
+                                <i className="bi bi-pencil" />
+                              </button>
+                              <button type="button" className="btn btn-sm btn-danger" title="Delete" aria-label="Delete" onClick={() => confirmDeleteBfa(b)}>
+                                <i className="bi bi-trash" />
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <i className="bi bi-send" />
+                  <div>No BFA entries yet</div>
+                  {canEditRfi && <div className="text-muted small">Click "+ Add" to create one</div>}
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="co-rfi-row">
             <div className="detail-panel" id="change-order-section">
               <PanelHeader
@@ -925,12 +1105,21 @@ export default function SubmissionOverview({
                     <button
                       type="button"
                       className="btn btn-sm btn-outline-secondary"
+                      onClick={copyUnansweredRfisEmail}
+                      disabled={!rfis.length}
+                      title="Copy one email listing every unanswered RFI question"
+                    >
+                      <i className="bi bi-envelope" /> Copy email
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-secondary"
                       onClick={exportRfisCSV}
                       disabled={!rfis.length}
                     >
                       <i className="bi bi-download" /> Export
                     </button>
-                    {canEditCoRfi && (
+                    {canEditRfi && (
                       <button type="button" className="btn btn-sm btn-warning" onClick={openCreateRfi}>
                         <i className="bi bi-plus-lg" /> Add
                       </button>
@@ -963,7 +1152,7 @@ export default function SubmissionOverview({
                       <RfiCard
                         key={rfi.id}
                         rfi={rfi}
-                        canEdit={canEditCoRfi}
+                        canEdit={canEditRfi}
                         canDelete={canDeleteRfis}
                         onEdit={openEditRfi}
                         onDelete={setDeleteTargetRfi}
@@ -983,7 +1172,7 @@ export default function SubmissionOverview({
                   <div className="empty-state">
                     <i className="bi bi-clipboard" />
                     <div>No RFIs yet</div>
-                    {canEditCoRfi && <div className="text-muted small">Click "+ Add" to create one</div>}
+                    {canEditRfi && <div className="text-muted small">Click "+ Add" to create one</div>}
                   </div>
                 )}
               </div>
@@ -1184,6 +1373,18 @@ export default function SubmissionOverview({
         </div>
       )}
 
+      <CreateBfaModal
+        open={bfaModalOpen}
+        onClose={() => {
+          setBfaModalOpen(false);
+          setEditingBfa(null);
+        }}
+        onSubmit={submitBfa}
+        submitting={editingBfa ? updateBfa.isPending : createBfa.isPending}
+        initial={editingBfa}
+        submissionOptions={records}
+      />
+
       <CreateRfiModal
         open={rfiModalOpen}
         onClose={() => {
@@ -1205,7 +1406,7 @@ export default function SubmissionOverview({
         open={!!viewingRfi}
         onClose={() => setViewingRfiId(null)}
         rfi={viewingRfi}
-        canEdit={canEditCoRfi}
+        canEdit={canEditRfi}
         canDelete={canDeleteRfis}
         onEdit={openEditRfi}
         onDelete={setDeleteTargetRfi}

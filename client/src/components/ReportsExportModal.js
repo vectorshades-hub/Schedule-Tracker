@@ -12,10 +12,11 @@ const EMPTY_FORM = {
   f_billable: "", f_invoice_released: "", f_sub_from: "", f_sub_to: "", f_due_from: "", f_due_to: "",
 };
 
-/** Ad-hoc filtered Excel export — org-wide for admin/management, scoped to own data for team leads. Opened from the navbar's "Reports" link. */
+/** Ad-hoc filtered Excel export — org-wide for admin/management, scoped to own data for team leads and qaqc. Opened from the navbar's "Reports" link. */
 export default function ReportsExportModal({ open, onClose, role }) {
   const toast = useToast();
   const isTeamLead = role === "team_lead";
+  const isScoped = isTeamLead || role === "qaqc";
   const [meta, setMeta] = useState({ projects: [], clients: [], teams: [] });
   const [form, setForm] = useState(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
@@ -143,7 +144,7 @@ export default function ReportsExportModal({ open, onClose, role }) {
         </div>
 
         <p className="text-muted small mt-3 mb-0">
-          <i className="bi bi-info-circle" /> Exports as .xlsx — opens in Excel. {role === "team_lead" ? "Export includes only the records you have access to." : "Export is org-wide (not limited to your selected teams)."}
+          <i className="bi bi-info-circle" /> Exports as .xlsx — opens in Excel. {isScoped ? "Export includes only the records you have access to." : "Export is org-wide (not limited to your selected teams)."}
         </p>
       </form>
     </Modal>

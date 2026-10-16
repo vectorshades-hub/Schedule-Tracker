@@ -406,6 +406,9 @@ router.post("/:id/approval", requireRole("admin", "management"), async (req, res
     if (existing.requiresApproval && !(await canApproveChangeOrder(user, req.session.role, existing.team))) {
       return res.status(403).json({ ok: false, error: "You're not an approver for this team's change orders." });
     }
+    if (existing.approval === "Approved" && approval === "Rejected") {
+      return res.status(400).json({ ok: false, error: "This change order is already approved and can't be rejected." });
+    }
 
     existing.set({ approval, approvalBy: user, approvalAt: new Date(), updatedBy: user, updatedAt: new Date() });
     const co = await existing.save();
@@ -639,3 +642,6 @@ router.get("/backfill-team", requireRole("admin"), async (req, res) => {
 });
 
 module.exports = router;
+// Reused by the project Weekly Status export (routes/projects.js) so its CO section
+// shows the same team-scoped set as the project page.
+module.exports.filterChangeOrdersForViewer = filterChangeOrdersForViewer;

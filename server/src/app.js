@@ -25,6 +25,8 @@ const rfisRoutes = require("./routes/rfis");
 const managementDashboardRoutes = require("./routes/managementDashboard");
 const financeDashboardRoutes = require("./routes/financeDashboard");
 const backupsRoutes = require("./routes/backups");
+const issuesRoutes = require("./routes/issues");
+const bfasRoutes = require("./routes/bfas");
 
 const app = express();
 
@@ -37,6 +39,9 @@ app.use(
     // tool accessed from many devices on the local network.
     origin: true,
     credentials: true,
+    // The client runs on a different port, so the browser hides this header
+    // unless exposed — api.download() reads the server's filename from it.
+    exposedHeaders: ["Content-Disposition"],
   })
 );
 app.use(express.json({ limit: "10mb" }));
@@ -82,6 +87,8 @@ app.use("/api/rfis", rfisRoutes);
 app.use("/api/management-dashboard", managementDashboardRoutes);
 app.use("/api/finance-dashboard", financeDashboardRoutes);
 app.use("/api/backups", backupsRoutes);
+app.use("/api/issues", issuesRoutes);
+app.use("/api/bfas", bfasRoutes);
 
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 

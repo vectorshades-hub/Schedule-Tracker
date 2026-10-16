@@ -13,7 +13,7 @@ import { useToast } from "../lib/ToastContext";
 
 /**
  * Admin-only "⋮" overflow menu in the navbar — holds the less-used admin
- * links (Users, Add User, Bulk Upload, Activity Log, Request Log, Backup) so the
+ * links (Settings, Users, Add User, Bulk Upload, Activity Log, Request Log, Backup) so the
  * top bar stays on one line. Closes on outside click, Escape, or picking an item.
  */
 function AdminMoreMenu({ onAddUser, onBackup }) {
@@ -46,6 +46,7 @@ function AdminMoreMenu({ onAddUser, onBackup }) {
       </button>
       {open && (
         <div className="st-more-menu" role="menu">
+          <a href="/settings" role="menuitem"><i className="bi bi-gear-fill" /> Settings</a>
           <a href="/users" role="menuitem"><i className="bi bi-people-fill" /> Users</a>
           <a href="#" role="menuitem" onClick={(e) => { e.preventDefault(); setOpen(false); onAddUser(); }}>
             <i className="bi bi-person-plus-fill" /> Add User
@@ -157,7 +158,6 @@ export default function AppLayout({ children, allow }) {
             </span>
           </span>
 
-          {role === "admin" && <a href="/settings"><i className="bi bi-gear-fill" /> Settings</a>}
           {["admin", "management", "team_lead"].includes(role) && (
             <>
               <a href="/projects"><i className="bi bi-folder-fill" /> Projects</a>
@@ -165,9 +165,12 @@ export default function AppLayout({ children, allow }) {
             </>
           )}
           {["admin", "management", "team_lead", "qaqc", "user"].includes(role) && (
-            <a href="/editing-log"><i className="bi bi-pencil-square" /> Editing Log</a>
+            <>
+              <a href="/editing-log"><i className="bi bi-pencil-square" /> Editing Log</a>
+              <a href="/issues"><i className="bi bi-bug-fill" /> Issues</a>
+            </>
           )}
-          {["admin", "management", "team_lead"].includes(role) && (
+          {["admin", "management", "team_lead", "qaqc"].includes(role) && (
             <a href="#" onClick={(e) => { e.preventDefault(); setReportsOpen(true); }}>
               <i className="bi bi-file-earmark-bar-graph-fill" /> Reports
             </a>
@@ -219,7 +222,7 @@ export default function AppLayout({ children, allow }) {
 
       {role === "admin" && <BackupModal open={backupOpen} onClose={() => setBackupOpen(false)} />}
 
-      {["admin", "management", "team_lead"].includes(role) && (
+      {["admin", "management", "team_lead", "qaqc"].includes(role) && (
         <ReportsExportModal open={reportsOpen} onClose={() => setReportsOpen(false)} role={role} />
       )}
     </div>

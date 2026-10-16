@@ -55,7 +55,7 @@ export default function CreateRfiModal({ open, onClose, onSubmit, submitting, in
             title: initial.title || "",
             questions:
               initial.questions && initial.questions.length
-                ? initial.questions.map((q) => ({ text: q.text || "", answer: q.answer || "", response_received_date: q.response_received_date || "" }))
+                ? initial.questions.map((q) => ({ id: q.id, text: q.text || "", answer: q.answer || "", response_received_date: q.response_received_date || "" }))
                 : [emptyQuestion()],
             date: initial.date || todayISO(),
             expected_response_date: initial.expected_response_date || todayISO(),

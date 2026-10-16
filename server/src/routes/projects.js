@@ -1,7 +1,7 @@
 const express = require("express");
 const path = require("path");
 const createSafeRouter = require("../utils/safeRouter");
-const { Project, Client, Record } = require("../models");
+const { Project, Client, Record, Rfi, ChangeOrder, Bfa } = require("../models");
 const { requireRole, requireAuth } = require("../middleware/auth");
 const upload = require("../middleware/upload");
 const { writeLog } = require("../services/logging");
@@ -16,6 +16,10 @@ const {
   deleteProjectImage,
 } = require("../utils/fileStorage");
 const env = require("../config/env");
+const { loadRecords } = require("../services/recordVisibility");
+const { buildWeeklyStatusData, buildWeeklyStatusWorkbook, buildWeeklyStatusPdf } = require("../services/weeklyStatusExport");
+const { filterChangeOrdersForViewer } = require("./changeOrders");
+const { daysAwaited, loadSubmissions } = require("./bfas");
 
 const router = createSafeRouter();
 
@@ -88,6 +92,74 @@ router.get("/:name", requireAuth, async (req, res) => {
     image_filename: p.imageFilename || "",
     quoted_hours: p.quotedHours || 0,
   });
+});
+
+/**
+ * GET /api/projects/:name/weekly-status — downloads the project's Weekly
+ * Project Status report — .xlsx by default, .pdf with ?format=pdf (see
+ * services/weeklyStatusExport.js). Uses the
+ * same role-scoped submissions and change orders the project page shows.
+ */
+router.get("/:name/weekly-status", requireAuth, async (req, res) => {
+  const name = decodeURIComponent(req.params.name);
+  const { username, role } = req.session;
+  const [project, records, rfis, changeOrders, bfaDocs] = await Promise.all([
+    Project.findOne({ name }).lean(),
+    loadRecords(username, role, null, { includeAllCompleted: true }).then((rows) => rows.filter((r) => r.project === name)),
+    Rfi.find({ project: name }).lean(),
+    ChangeOrder.find({ project: name }).lean(),
+    Bfa.find({ project: name }).sort({ submittedDate: 1, createdAt: 1 }).lean(),
+  ]);
+  if (!project && !records.length) return res.status(404).json({ ok: false, error: "Project not found." });
+
+  const bfaSubs = await loadSubmissions(bfaDocs);
+  // Only open BFAs (status "No") go on the report.
+  const bfas = bfaDocs
+    .filter((b) => (b.status || "No") === "No")
+    .map((b) => {
+      const sub = bfaSubs.get(b.submissionId);
+      return {
+        tr: b.trNumber || "",
+        submission: sub?.submissionName || `#${b.submissionId}`,
+        sent: b.submittedDate,
+        desc: b.description,
+        days: daysAwaited(b, sub),
+      };
+    });
+
+  const linkedIds = [...new Set(rfis.flatMap((r) => r.linkedSubmissionIds || []))];
+  const linked = linkedIds.length ? await Record.find({ legacyId: { $in: linkedIds } }).select("legacyId submissionName").lean() : [];
+
+  const data = buildWeeklyStatusData({
+    projectName: name,
+    clientName: project?.client || records[0]?.client || "",
+    createdBy: username || "",
+    records,
+    rfis,
+    changeOrders: await filterChangeOrdersForViewer(changeOrders, username, role),
+    submissionNames: new Map(linked.map((r) => [r.legacyId, r.submissionName])),
+    bfas,
+  });
+
+  const asPdf = req.query.format === "pdf";
+  const t = statusEngine.todayUTC();
+  const pad = (n) => String(n).padStart(2, "0");
+  // "<Project name>_Weekly_status_mm_dd_yy" — project name kept as typed (spaces
+  // included); only characters invalid in file names / HTTP headers are dropped.
+  const safeName = name.replace(/[\\/:*?"<>|\x00-\x1f\x7f-￿]/g, "").trim() || "Project";
+  const filename = `${safeName}_Weekly_status_${pad(t.getUTCMonth() + 1)}_${pad(t.getUTCDate())}_${String(t.getUTCFullYear()).slice(2)}.${asPdf ? "pdf" : "xlsx"}`;
+
+  writeLog("WEEKLY-STATUS-EXPORT", `'${name}' (${asPdf ? "pdf" : "xlsx"})`, username);
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  if (asPdf) {
+    res.setHeader("Content-Type", "application/pdf");
+    buildWeeklyStatusPdf(data, res);
+    return;
+  }
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  const wb = await buildWeeklyStatusWorkbook(data);
+  await wb.xlsx.write(res);
+  res.end();
 });
 
 /**

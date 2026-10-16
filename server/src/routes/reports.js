@@ -9,13 +9,15 @@ const router = createSafeRouter();
 /**
  * POST /api/reports/export — ad-hoc filtered Excel export. admin/management get
  * the org-wide data (bypasses caller's own team scoping — matches the original);
- * team leads get only the records they can already see on their own dashboard.
+ * team leads and qaqc get only the records they can already see on their own
+ * dashboard (qaqc: their linked team leads, or everything when none are linked).
  */
-router.post("/export", requireRole("admin", "management", "team_lead"), async (req, res) => {
+router.post("/export", requireRole("admin", "management", "team_lead", "qaqc"), async (req, res) => {
   const b = req.body;
+  const { role, username } = req.session;
   let records =
-    req.session.role === "team_lead"
-      ? await loadRecords(req.session.username, "team_lead", null, { includeAllCompleted: true })
+    role === "team_lead" || role === "qaqc"
+      ? await loadRecords(username, role, null, { includeAllCompleted: true })
       : await loadRecords("", "admin");
 
   const eq = (val, filter) => !filter || String(val || "").toLowerCase() === String(filter).toLowerCase();

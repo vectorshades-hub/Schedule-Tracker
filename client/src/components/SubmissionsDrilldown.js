@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "../lib/api";
 import { canEditRecord } from "../lib/recordEditAccess";
@@ -89,6 +89,18 @@ export default function SubmissionsDrilldown({ by, name }) {
       refetchProject();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Failed to mark Fabrication completed.");
+    }
+  }
+
+  const [weeklyBusy, setWeeklyBusy] = useState(null); // "xlsx" | "pdf" while that download is being generated
+  async function handleWeeklyStatus(format) {
+    setWeeklyBusy(format);
+    try {
+      await api.download(`/projects/${encodeURIComponent(name)}/weekly-status`, { params: { format } });
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Failed to generate weekly status.");
+    } finally {
+      setWeeklyBusy(null);
     }
   }
 
@@ -247,13 +259,44 @@ export default function SubmissionsDrilldown({ by, name }) {
         meta={`${stats.total} submissions`}
         right={
           by === "project" && (
-            <ProjectHeroExtras
-              projectName={name}
-              canEdit={canEdit}
-              quotedHours={projectData?.quoted_hours || 0}
-              onQuotedHoursChanged={refetchProject}
-              changeOrders={heroChangeOrders}
-            />
+            <>
+              <div className="hero-stat-card weekly-status-card">
+                <div className="hero-stat-card-label">
+                  <span className="hero-stat-icon hero-stat-icon-teal"><i className="bi bi-file-earmark-spreadsheet" /></span>
+                  Weekly Status
+                </div>
+                <div className="weekly-status-options">
+                  {[
+                    { format: "xlsx", label: "Excel", icon: "bi-file-earmark-excel" },
+                    { format: "pdf", label: "PDF", icon: "bi-file-earmark-pdf" },
+                  ].map((opt, i) => (
+                    <Fragment key={opt.format}>
+                      {i > 0 && <span className="weekly-status-divider" />}
+                      <button
+                        type="button"
+                        className={`weekly-status-btn weekly-status-${opt.format}`}
+                        onClick={() => handleWeeklyStatus(opt.format)}
+                        disabled={!!weeklyBusy}
+                        title={`Download this project's Weekly Project Status report (.${opt.format})`}
+                      >
+                        <i className={`bi ${opt.icon} weekly-status-file-icon`} />
+                        <span>{weeklyBusy === opt.format ? "Preparing…" : opt.label}</span>
+                        <span className="weekly-status-dl">
+                          {weeklyBusy === opt.format ? <span className="spinner-border spinner-border-sm" /> : <i className="bi bi-download" />}
+                        </span>
+                      </button>
+                    </Fragment>
+                  ))}
+                </div>
+              </div>
+              <ProjectHeroExtras
+                projectName={name}
+                canEdit={canEdit}
+                quotedHours={projectData?.quoted_hours || 0}
+                onQuotedHoursChanged={refetchProject}
+                changeOrders={heroChangeOrders}
+              />
+            </>
           )
         }
       />

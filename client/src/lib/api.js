@@ -64,7 +64,8 @@ export const api = {
     const blob = await res.blob();
     const disposition = res.headers.get("content-disposition") || "";
     const match = disposition.match(/filename="?([^"]+)"?/);
-    const filename = match ? match[1] : "download.xlsx";
+    const fallbackExt = (res.headers.get("content-type") || "").includes("pdf") ? "pdf" : "xlsx";
+    const filename = match ? match[1] : `download.${fallbackExt}`;
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
