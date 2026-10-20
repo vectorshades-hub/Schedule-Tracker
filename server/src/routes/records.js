@@ -635,7 +635,7 @@ router.post("/:id/type-complete", requireRole("admin", "management"), async (req
 router.get("/by-project", requireAuth, async (req, res) => {
   const { username, role } = req.session;
   const project = String(req.query.project || "");
-  const records = (await loadRecords(username, role, null, { includeAllCompleted: true })).filter(
+  const records = (await loadRecords(username, role, null, { includeAllCompleted: true, archivedProject: project })).filter(
     (r) => r.project === project
   );
   res.json({ records, unseen_notif: role === "admin" || role === "management" ? await getUnseenCount(username) : 0 });

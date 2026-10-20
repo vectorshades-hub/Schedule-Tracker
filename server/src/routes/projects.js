@@ -1,13 +1,13 @@
 const express = require("express");
 const path = require("path");
 const createSafeRouter = require("../utils/safeRouter");
-const { Project, Client, Record, Rfi, ChangeOrder } = require("../models");
+const { Project, Client, Record, Rfi, ChangeOrder, CompletedLog } = require("../models");
 const { requireRole, requireAuth } = require("../middleware/auth");
 const upload = require("../middleware/upload");
 const { writeLog } = require("../services/logging");
 const statusEngine = require("../services/statusEngine");
 const { canUpdateRecords } = require("../services/settingsService");
-const { getTeamsFromUsers } = require("../services/userHelpers");
+const { getTeamsFromUsers, getAllowedTeamsForUser } = require("../services/userHelpers");
 const {
   PROJECT_IMAGES_DIR,
   sanitizeFilename,
@@ -32,23 +32,36 @@ const router = createSafeRouter();
  * rides along too — the Reports export modal's Team and Created By pickers
  * (submissions are only ever created by a team lead or management user)
  * need the full org-wide list, not just the caller's own allowed teams.
- * Each `projectDetails` entry's `accessible` flag says whether the caller is
- * the Team or Created By on any of that project's records — the Manage
- * Projects page only opens the project detail page when it's true.
+ * Each `projectDetails` entry's `accessible` flag says whether the caller may
+ * open that project's detail page from the Manage Projects page: admins and
+ * management users with no teams assigned see every project; management
+ * users with teams see projects where they or one of their teams is the
+ * Team or Created By on a record; everyone else only their own.
  */
 router.get("/", requireAuth, async (req, res) => {
-  const username = req.session.username;
-  const [projects, clients, teams, ownProjects] = await Promise.all([
+  const { username, role } = req.session;
+  let accessUsers = [username];
+  let accessAll = role === "admin";
+  if (role === "management") {
+    const allowed = await getAllowedTeamsForUser(username);
+    if (allowed.length) accessUsers = [username, ...allowed];
+    else accessAll = true;
+  }
+  // Completed Log too — a project whose submissions only survive there
+  // (see loadRecords' archivedProject) still belongs to the same team.
+  const ownFilter = { $or: [{ team: { $in: accessUsers } }, { createdBy: { $in: accessUsers } }] };
+  const [projects, clients, teams, ownProjects, ownArchivedProjects] = await Promise.all([
     Project.find({}).sort({ name: 1 }).lean(),
     Client.find({}).sort({ name: 1 }).lean(),
     getTeamsFromUsers(),
-    Record.distinct("project", { $or: [{ team: username }, { createdBy: username }] }),
+    accessAll ? [] : Record.distinct("project", ownFilter),
+    accessAll ? [] : CompletedLog.distinct("project", ownFilter),
   ]);
-  const ownSet = new Set(ownProjects);
+  const ownSet = new Set([...ownProjects, ...ownArchivedProjects]);
   res.json({
     projects: projects.map((p) => p.name),
     clients: clients.map((c) => c.name),
-    projectDetails: projects.map((p) => ({ name: p.name, client: p.client || "", accessible: ownSet.has(p.name) })),
+    projectDetails: projects.map((p) => ({ name: p.name, client: p.client || "", accessible: accessAll || ownSet.has(p.name) })),
     teams,
   });
 });
@@ -110,7 +123,7 @@ router.get("/:name/weekly-status", requireAuth, async (req, res) => {
   const { username, role } = req.session;
   const [project, records, rfis, changeOrders] = await Promise.all([
     Project.findOne({ name }).lean(),
-    loadRecords(username, role, null, { includeAllCompleted: true }).then((rows) => rows.filter((r) => r.project === name)),
+    loadRecords(username, role, null, { includeAllCompleted: true, archivedProject: name }).then((rows) => rows.filter((r) => r.project === name)),
     Rfi.find({ project: name }).lean(),
     ChangeOrder.find({ project: name }).lean(),
   ]);

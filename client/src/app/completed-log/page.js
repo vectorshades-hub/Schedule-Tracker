@@ -267,8 +267,8 @@ export default function CompletedLogPage() {
           <tbody>
             {filtered.map((e) => (
               <tr key={e.id}>
-                <td className="cl-primary">{e.project}</td>
-                <td>{e.submission_name}</td>
+                <td className="cl-primary"><a className="proj-link" href={`/projects/${encodeURIComponent(e.project)}`}>{e.project}</a></td>
+                <td><a href={`/projects/${encodeURIComponent(e.project)}`}>{e.submission_name}</a></td>
                 <td>{e.client}</td>
                 <td><TypePill type={e.submission_type} /></td>
                 <td>{e.team}</td>

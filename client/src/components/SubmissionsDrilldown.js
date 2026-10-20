@@ -407,7 +407,7 @@ export default function SubmissionsDrilldown({ by, name }) {
                       <SwitchToggle
                         label="QA Done"
                         value={r.qaqc}
-                        disabled={!canEdit}
+                        disabled={!canEdit || r.archived}
                         onChange={(v) => toggleQaqc.mutate({ id: r.id, value: v }, { onSuccess: refetch })}
                       />
                     </td>
@@ -415,7 +415,7 @@ export default function SubmissionsDrilldown({ by, name }) {
                       <SwitchToggle
                         label="Billable"
                         value={r.billable}
-                        disabled={!canEdit}
+                        disabled={!canEdit || r.archived}
                         onChange={(v) => toggleField.mutate({ id: r.id, field: "billable", value: v }, { onSuccess: refetch })}
                       />
                     </td>
@@ -423,17 +423,20 @@ export default function SubmissionsDrilldown({ by, name }) {
                       <SwitchToggle
                         label="Invoice Released"
                         value={r.invoice_released}
-                        disabled={!canEditInvoiceReleased}
+                        disabled={!canEditInvoiceReleased || r.archived}
                         onChange={(v) => toggleField.mutate({ id: r.id, field: "invoice_released", value: v }, { onSuccess: refetch })}
                       />
                     </td>
                     <td>{r.created_by}</td>
                     <td>
                       <button className="btn btn-sm btn-outline-secondary" onClick={() => setInfoView(r)}><i className="bi bi-info-circle" /></button>
-                      {canEditRecord(user, r) && (
+                      {r.archived && (
+                        <span className="badge text-bg-light border ms-1" title="Only kept in the Completed Log — edit it there">Archived</span>
+                      )}
+                      {!r.archived && canEditRecord(user, r) && (
                         <button className="btn btn-sm btn-outline-primary ms-1" onClick={() => openEdit(r)}><i className="bi bi-pencil" /></button>
                       )}
-                      {canDelete && (
+                      {!r.archived && canDelete && (
                         <button className="btn btn-sm btn-outline-danger ms-1" onClick={() => setDeleteTarget(r)}><i className="bi bi-trash" /></button>
                       )}
                     </td>

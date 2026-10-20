@@ -6,7 +6,7 @@
  * byte-for-byte identical and easy to audit against the source.
  */
 const env = require("../config/env");
-const { Record } = require("../models");
+const { Record, CompletedLog } = require("../models");
 const statusEngine = require("./statusEngine");
 const {
   getLinkedTls,
@@ -53,6 +53,47 @@ function rowToRecord(row) {
     hold_image: row.hold ? row.hold.imageFilename || "" : "",
     hold_ts: row.hold && row.hold.ts ? new Date(row.hold.ts).toISOString() : "",
     hold_user: row.hold ? row.hold.user || "" : "",
+    archived: !!row.archived,
+  };
+}
+
+function toDateOrNull(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * A CompletedLog entry shaped like a Record row, so it can run through the
+ * same visibility rules and rowToRecord. Only used for entries whose live
+ * Record no longer exists (deleted, or only ever imported into the log) —
+ * `archived: true` marks it read-only for the client.
+ */
+function completedLogToRow(e) {
+  const completedAt = toDateOrNull(e.completedAt);
+  const dueDate = toDateOrNull(e.dueDate);
+  const overdue = completedAt && dueDate && completedAt.getTime() > dueDate.getTime() + 86400000;
+  return {
+    _id: e._id,
+    legacyId: e.recordId,
+    project: e.project,
+    submissionName: e.submissionName,
+    client: e.client,
+    submissionType: e.submissionType,
+    steelType: e.steelType,
+    team: e.team,
+    subDate: toDateOrNull(e.subDate),
+    dueDate,
+    remarks: e.remarks,
+    status: overdue ? "COMPLETED (OVERDUE)" : "COMPLETED",
+    createdAt: toDateOrNull(e.createdAt),
+    completedAt,
+    createdBy: e.createdBy,
+    qaqc: e.qaqc,
+    percentage: e.percentage,
+    billable: e.billable,
+    invoiceReleased: e.invoiceReleased,
+    archived: true,
   };
 }
 
@@ -64,10 +105,20 @@ function rowToRecord(row) {
  *   grace-period cutoff below, so every completed record for the caller's role/team
  *   still shows up regardless of how long ago it completed (used by the project detail
  *   page's Submission Details panel — see GET /api/records/by-project).
+ * @param {string} [options.archivedProject] - also include this project's Completed Log
+ *   entries that no longer have a live Record (see completedLogToRow), so a project
+ *   whose submissions only survive in the log doesn't show up empty.
  */
 async function loadRecords(username = "", role = "admin", teamsFilter = null, options = {}) {
-  const { includeAllCompleted = false } = options;
+  const { includeAllCompleted = false, archivedProject = null } = options;
   const rawRows = await Record.find({}).sort({ subDate: 1, createdAt: 1 }).lean();
+  if (archivedProject != null) {
+    const liveIds = new Set(rawRows.map((r) => r.legacyId));
+    const archived = await CompletedLog.find({ project: archivedProject }).lean();
+    const extra = archived.filter((e) => !liveIds.has(e.recordId)).map(completedLogToRow);
+    rawRows.push(...extra);
+    rawRows.sort((a, b) => (a.subDate?.getTime() ?? 0) - (b.subDate?.getTime() ?? 0) || (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0));
+  }
 
   const graceDays =
     role === "admin" || role === "qaqc" ? env.completedDaysGraceExtended : env.completedDaysGrace;
