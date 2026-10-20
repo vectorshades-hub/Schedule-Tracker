@@ -26,7 +26,6 @@ const managementDashboardRoutes = require("./routes/managementDashboard");
 const financeDashboardRoutes = require("./routes/financeDashboard");
 const backupsRoutes = require("./routes/backups");
 const issuesRoutes = require("./routes/issues");
-const bfasRoutes = require("./routes/bfas");
 
 const app = express();
 
@@ -88,7 +87,6 @@ app.use("/api/management-dashboard", managementDashboardRoutes);
 app.use("/api/finance-dashboard", financeDashboardRoutes);
 app.use("/api/backups", backupsRoutes);
 app.use("/api/issues", issuesRoutes);
-app.use("/api/bfas", bfasRoutes);
 
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 

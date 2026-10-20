@@ -409,8 +409,10 @@ router.put("/:id", requireAuth, upload.single("onhold_file"), async (req, res) =
 
     let status, completedAt;
     if (statusOverride === "COMPLETED") {
-      status = statusEngine.resolveCompleteStatus(dueDate).status;
       completedAt = existing.completedAt || statusEngine.completedAtNow();
+      // Measured to the day it was completed, so re-saving an already
+      // completed record later (e.g. to add its BFA date) doesn't grow the overdue count.
+      status = statusEngine.resolveCompleteStatus(dueDate, completedAt).status;
     } else if (statusOverride === "ON HOLD") {
       status = "ON HOLD";
       completedAt = null;
@@ -448,6 +450,15 @@ router.put("/:id", requireAuth, upload.single("onhold_file"), async (req, res) =
     if (statusOverride === "COMPLETED" && !existing.typeCompleted) {
       existing.typeCompleted = true;
       existing.typeCompletedAt = completedAt;
+    }
+
+    // BFA receipt date only applies to a completed record; like steel_type,
+    // only touch it when the form sent it.
+    if (!status.toUpperCase().startsWith("COMPLETED")) {
+      existing.bfaReceivedDate = null;
+    } else if (b.bfa_received_date !== undefined) {
+      const bfaRaw = String(b.bfa_received_date || "").trim();
+      existing.bfaReceivedDate = bfaRaw ? statusEngine.parseDate(bfaRaw) : null;
     }
 
     // Percentage is admin/management-only — silently ignore it from anyone

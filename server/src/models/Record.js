@@ -39,6 +39,11 @@ const recordSchema = new mongoose.Schema({
   // project either — that still requires the real COMPLETED status).
   typeCompleted: { type: Boolean, default: false },
   typeCompletedAt: { type: Date, default: null },
+  // Date the customer returned this submission (BFA). Only meaningful once
+  // the record is COMPLETED — until it's set, a completed record is "Waiting
+  // for BFA", and BFA_WAIT_DAYS after completedAt it goes on the Weekly Status report's
+  // BFA Tracking section (services/weeklyStatusExport.js).
+  bfaReceivedDate: { type: Date, default: null },
 });
 
 recordSchema.index({ status: 1 });

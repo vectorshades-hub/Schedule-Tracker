@@ -19,7 +19,6 @@ import {
   useSetRfiResponseReceived,
   useSetRfiQuestionResponseReceived,
 } from "../hooks/useRfis";
-import { useBfas, useCreateBfa, useUpdateBfa, useDeleteBfa } from "../hooks/useBfas";
 import { useProjectActivity } from "../hooks/useActivityLog";
 import {
   computeProjectLifecycle,
@@ -28,6 +27,7 @@ import {
   fmtDateLong,
   fmtDateTimeLong,
   parseDate,
+  daysBetween,
   clusterByDate,
   OFA_TYPES,
   FAB_TYPES,
@@ -40,8 +40,42 @@ import ChangeOrderCard from "./ChangeOrderCard";
 import CreateRfiModal from "./CreateRfiModal";
 import RfiCard, { copyText, unansweredRfisEmailText } from "./RfiCard";
 import RfiDetailsModal from "./RfiDetailsModal";
-import CreateBfaModal from "./CreateBfaModal";
 import ImageLightboxModal from "./ImageLightboxModal";
+
+// Same threshold as the Weekly Status report's BFA Tracking section
+// (server/src/services/weeklyStatusExport.js BFA_WAIT_DAYS).
+const BFA_WAIT_DAYS = 10;
+
+/** A completed submission's BFA state — "Waiting for BFA" (red once past
+ * BFA_WAIT_DAYS since it was completed) until a receipt date is set on
+ * it from the Edit form, then "BFA received". Nothing for open submissions. */
+function BfaTag({ record }) {
+  if (!record.tag.startsWith("completed")) return null;
+  if (record.bfa_received_date) {
+    return (
+      <span className="bfa-tag bfa-tag-received" title={`BFA received ${fmtDateLong(record.bfa_received_date)}`}>
+        <i className="bi bi-check2-circle" /> BFA {fmtDateLong(record.bfa_received_date)}
+      </span>
+    );
+  }
+  // Counted from the day it was marked completed (date part only, so a
+  // same-day completion is 0d); older records without one fall back to the submission date.
+  const completed = parseDate(record.completed_at);
+  const sent = completed
+    ? new Date(Date.UTC(completed.getUTCFullYear(), completed.getUTCMonth(), completed.getUTCDate()))
+    : parseDate(record.sub_date_raw || record.due_date_raw);
+  const now = new Date();
+  const days = sent ? Math.max(0, daysBetween(new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())), sent)) : null;
+  const late = days !== null && days > BFA_WAIT_DAYS;
+  return (
+    <span
+      className={`bfa-tag ${late ? "bfa-tag-late" : "bfa-tag-waiting"}`}
+      title={late ? `No BFA for ${days} days — listed under BFA Tracking in the Weekly Status report` : "Set the BFA received date from Edit"}
+    >
+      <i className="bi bi-hourglass-split" /> Waiting for BFA{days !== null ? ` · ${days}d` : ""}
+    </span>
+  );
+}
 
 /** A color-coded icon + title(+count)/subtitle + optional action buttons —
  * every panel below uses this so each section reads as its own distinct
@@ -241,8 +275,6 @@ export default function SubmissionOverview({
   const [deleteTargetRfi, setDeleteTargetRfi] = useState(null);
   const [viewingRfiId, setViewingRfiId] = useState(null); // id of the RFI shown in RfiDetailsModal, or null
   const [rfiFilter, setRfiFilter] = useState("All"); // "All" | "Pending" | "Overdue" | "Returned"
-  const [bfaModalOpen, setBfaModalOpen] = useState(false);
-  const [editingBfa, setEditingBfa] = useState(null); // the BFA row being edited, or null (create mode)
   const [coFilter, setCoFilter] = useState("All"); // "All" or a CHANGE_ORDER_STATUSES key
   const [subTypeFilter, setSubTypeFilter] = useState(""); // "" (all) or a submission_type
   const [subCompletedFilter, setSubCompletedFilter] = useState(""); // "" (all) | "Completed" | "Not Completed"
@@ -261,10 +293,6 @@ export default function SubmissionOverview({
   const deleteRfi = useDeleteRfi();
   const setRfiResponse = useSetRfiResponseReceived();
   const setRfiQuestionResponse = useSetRfiQuestionResponseReceived();
-  const { data: bfaData } = useBfas(projectName);
-  const createBfa = useCreateBfa();
-  const updateBfa = useUpdateBfa();
-  const deleteBfa = useDeleteBfa();
   const { data: deletedActivityData } = useProjectActivity(projectName);
 
   // Pending-RFI reminders (notifications page / browser notification) link
@@ -562,77 +590,6 @@ export default function SubmissionOverview({
     );
   }
 
-  const bfas = bfaData?.bfas || [];
-
-  function openCreateBfa() {
-    setEditingBfa(null);
-    setBfaModalOpen(true);
-  }
-
-  function openEditBfa(bfa) {
-    setEditingBfa(bfa);
-    setBfaModalOpen(true);
-  }
-
-  async function submitBfa(form) {
-    const payload = {
-      project: projectName,
-      tr_number: form.tr_number,
-      submission_id: form.submission_id,
-      submitted_date: form.submitted_date,
-      description: form.description,
-      days_awaited_override: form.days_awaited_override,
-      status: form.status,
-    };
-    try {
-      const res = editingBfa
-        ? await updateBfa.mutateAsync({ id: editingBfa.id, data: payload })
-        : await createBfa.mutateAsync(payload);
-      toast.success(res.message || `BFA ${editingBfa ? "updated" : "added"}.`);
-      setBfaModalOpen(false);
-      setEditingBfa(null);
-    } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Failed to save BFA.");
-    }
-  }
-
-  function confirmToggleBfaStatus(bfa) {
-    const next = bfa.status === "Yes" ? "No" : "Yes";
-    const label = [bfa.tr_number && `TR# ${bfa.tr_number}`, bfa.submission_name].filter(Boolean).join(" – ") || `#${bfa.submission_id}`;
-    requestConfirm("Change BFA status", `Change the status of ${label} to "${next}"?`, async () => {
-      try {
-        // PUT takes the whole entry, so resend the row as-is with the new status.
-        await updateBfa.mutateAsync({
-          id: bfa.id,
-          data: {
-            project: projectName,
-            tr_number: bfa.tr_number,
-            submission_id: bfa.submission_id,
-            submitted_date: bfa.submitted_date,
-            description: bfa.description,
-            days_awaited_override: bfa.days_awaited_override,
-            status: next,
-          },
-        });
-        toast.success(`Status set to "${next}".`);
-      } catch (e) {
-        toast.error(e instanceof ApiError ? e.message : "Failed to update BFA status.");
-      }
-    });
-  }
-
-  function confirmDeleteBfa(bfa) {
-    const label = [bfa.tr_number && `TR# ${bfa.tr_number}`, bfa.submission_name].filter(Boolean).join(" – ") || `#${bfa.submission_id}`;
-    requestConfirm("Delete BFA", `Delete the BFA entry for ${label}?`, async () => {
-      try {
-        const res = await deleteBfa.mutateAsync({ id: bfa.id });
-        toast.success(res.message || "BFA deleted.");
-      } catch (e) {
-        toast.error(e instanceof ApiError ? e.message : "Failed to delete BFA.");
-      }
-    });
-  }
-
   // Requires every record already completed (button is disabled otherwise —
   // see submissionCompleted below); the server re-checks this too. One-way
   // once confirmed here, unless a fresh submission is later added to the
@@ -720,11 +677,6 @@ export default function SubmissionOverview({
             </div>
           </div>
           <div className="lifecycle-actions">
-            {canEditRfi && (
-              <button type="button" className="btn btn-sm btn-outline-bfa" onClick={openCreateBfa}>
-                <i className="bi bi-send-check" /> BFA
-              </button>
-            )}
             {canEditRfi && (
               <button type="button" className="btn btn-sm btn-outline-warning" onClick={openCreateRfi}>
                 <i className="bi bi-file-earmark-text" /> RFI / Clarification
@@ -881,6 +833,7 @@ export default function SubmissionOverview({
                       </div>
                       <div className="submission-row-right">
                         <span className="submission-row-date">{fmtDateLong(r.sub_date_raw) || "Not set"}</span>
+                        <BfaTag record={r} />
                         <StatusBadge status={r.status} tag={r.tag} />
                         <span className="submission-row-pct">{r.percentage ?? 0}%</span>
                         <button
@@ -912,88 +865,6 @@ export default function SubmissionOverview({
                   <i className="bi bi-funnel" />
                   <div>No matching submissions</div>
                   <div className="text-muted small">Try a different filter</div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="detail-panel" id="bfa-section">
-            <PanelHeader
-              icon="bi-send-check-fill"
-              color="teal"
-              title="BFA Tracking"
-              subtitle="Transmittals awaiting return from the customer"
-              count={bfas.length}
-              actions={
-                canEditRfi && (
-                  <button type="button" className="btn btn-sm btn-bfa" onClick={openCreateBfa}>
-                    <i className="bi bi-plus-lg" /> Add
-                  </button>
-                )
-              }
-            />
-            <div className="detail-panel-body">
-              {bfas.length ? (
-                <div className="table-responsive">
-                  <table className="table table-sm align-middle bfa-table mb-0">
-                    <thead>
-                      <tr>
-                        <th>TR#</th>
-                        <th>Submission</th>
-                        <th>Submitted date</th>
-                        <th>Description</th>
-                        <th className="text-center">Days awaited</th>
-                        <th className="text-center">Status</th>
-                        {canEditRfi && <th />}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bfas.map((b) => (
-                        <tr key={b.id}>
-                          <td className="fw-semibold">{b.tr_number || <span className="text-muted">—</span>}</td>
-                          <td>{b.submission_name || `#${b.submission_id}`}</td>
-                          <td className="text-nowrap">{fmtDateLong(b.submitted_date) || "—"}</td>
-                          <td className="bfa-desc">{b.description || <span className="text-muted">—</span>}</td>
-                          <td className="text-center">
-                            {b.days_awaited ?? "—"}
-                            {b.days_awaited_override !== null && (
-                              <i className="bi bi-pencil-fill bfa-manual-icon" title="Set manually" />
-                            )}
-                          </td>
-                          <td className="text-center">
-                            <div className="form-check form-switch bfa-status-switch">
-                              <input
-                                type="checkbox"
-                                role="switch"
-                                className="form-check-input"
-                                checked={b.status === "Yes"}
-                                disabled={!canEditRfi || updateBfa.isPending}
-                                title={canEditRfi ? "Change status" : undefined}
-                                aria-label={`Status: ${b.status || "No"}`}
-                                onChange={() => confirmToggleBfaStatus(b)}
-                              />
-                            </div>
-                          </td>
-                          {canEditRfi && (
-                            <td className="text-end text-nowrap">
-                              <button type="button" className="btn btn-sm btn-warning me-1" title="Edit" aria-label="Edit" onClick={() => openEditBfa(b)}>
-                                <i className="bi bi-pencil" />
-                              </button>
-                              <button type="button" className="btn btn-sm btn-danger" title="Delete" aria-label="Delete" onClick={() => confirmDeleteBfa(b)}>
-                                <i className="bi bi-trash" />
-                              </button>
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="empty-state">
-                  <i className="bi bi-send" />
-                  <div>No BFA entries yet</div>
-                  {canEditRfi && <div className="text-muted small">Click "+ Add" to create one</div>}
                 </div>
               )}
             </div>
@@ -1335,6 +1206,7 @@ export default function SubmissionOverview({
             </div>
             <div className="dot-popup-status">
               <StatusBadge status={r.status} tag={r.tag} />
+              <BfaTag record={r} />
             </div>
             {r.remarks && <div className="dp-note">"{r.remarks}"</div>}
           </div>
@@ -1372,18 +1244,6 @@ export default function SubmissionOverview({
           </div>
         </div>
       )}
-
-      <CreateBfaModal
-        open={bfaModalOpen}
-        onClose={() => {
-          setBfaModalOpen(false);
-          setEditingBfa(null);
-        }}
-        onSubmit={submitBfa}
-        submitting={editingBfa ? updateBfa.isPending : createBfa.isPending}
-        initial={editingBfa}
-        submissionOptions={records}
-      />
 
       <CreateRfiModal
         open={rfiModalOpen}

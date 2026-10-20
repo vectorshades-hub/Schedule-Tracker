@@ -1,7 +1,7 @@
 const express = require("express");
 const path = require("path");
 const createSafeRouter = require("../utils/safeRouter");
-const { Project, Client, Record, Rfi, ChangeOrder, Bfa } = require("../models");
+const { Project, Client, Record, Rfi, ChangeOrder } = require("../models");
 const { requireRole, requireAuth } = require("../middleware/auth");
 const upload = require("../middleware/upload");
 const { writeLog } = require("../services/logging");
@@ -19,7 +19,6 @@ const env = require("../config/env");
 const { loadRecords } = require("../services/recordVisibility");
 const { buildWeeklyStatusData, buildWeeklyStatusWorkbook, buildWeeklyStatusPdf } = require("../services/weeklyStatusExport");
 const { filterChangeOrdersForViewer } = require("./changeOrders");
-const { daysAwaited, loadSubmissions } = require("./bfas");
 
 const router = createSafeRouter();
 
@@ -33,17 +32,23 @@ const router = createSafeRouter();
  * rides along too — the Reports export modal's Team and Created By pickers
  * (submissions are only ever created by a team lead or management user)
  * need the full org-wide list, not just the caller's own allowed teams.
+ * Each `projectDetails` entry's `accessible` flag says whether the caller is
+ * the Team or Created By on any of that project's records — the Manage
+ * Projects page only opens the project detail page when it's true.
  */
 router.get("/", requireAuth, async (req, res) => {
-  const [projects, clients, teams] = await Promise.all([
+  const username = req.session.username;
+  const [projects, clients, teams, ownProjects] = await Promise.all([
     Project.find({}).sort({ name: 1 }).lean(),
     Client.find({}).sort({ name: 1 }).lean(),
     getTeamsFromUsers(),
+    Record.distinct("project", { $or: [{ team: username }, { createdBy: username }] }),
   ]);
+  const ownSet = new Set(ownProjects);
   res.json({
     projects: projects.map((p) => p.name),
     clients: clients.map((c) => c.name),
-    projectDetails: projects.map((p) => ({ name: p.name, client: p.client || "" })),
+    projectDetails: projects.map((p) => ({ name: p.name, client: p.client || "", accessible: ownSet.has(p.name) })),
     teams,
   });
 });
@@ -103,29 +108,13 @@ router.get("/:name", requireAuth, async (req, res) => {
 router.get("/:name/weekly-status", requireAuth, async (req, res) => {
   const name = decodeURIComponent(req.params.name);
   const { username, role } = req.session;
-  const [project, records, rfis, changeOrders, bfaDocs] = await Promise.all([
+  const [project, records, rfis, changeOrders] = await Promise.all([
     Project.findOne({ name }).lean(),
     loadRecords(username, role, null, { includeAllCompleted: true }).then((rows) => rows.filter((r) => r.project === name)),
     Rfi.find({ project: name }).lean(),
     ChangeOrder.find({ project: name }).lean(),
-    Bfa.find({ project: name }).sort({ submittedDate: 1, createdAt: 1 }).lean(),
   ]);
   if (!project && !records.length) return res.status(404).json({ ok: false, error: "Project not found." });
-
-  const bfaSubs = await loadSubmissions(bfaDocs);
-  // Only open BFAs (status "No") go on the report.
-  const bfas = bfaDocs
-    .filter((b) => (b.status || "No") === "No")
-    .map((b) => {
-      const sub = bfaSubs.get(b.submissionId);
-      return {
-        tr: b.trNumber || "",
-        submission: sub?.submissionName || `#${b.submissionId}`,
-        sent: b.submittedDate,
-        desc: b.description,
-        days: daysAwaited(b, sub),
-      };
-    });
 
   const linkedIds = [...new Set(rfis.flatMap((r) => r.linkedSubmissionIds || []))];
   const linked = linkedIds.length ? await Record.find({ legacyId: { $in: linkedIds } }).select("legacyId submissionName").lean() : [];
@@ -138,7 +127,6 @@ router.get("/:name/weekly-status", requireAuth, async (req, res) => {
     rfis,
     changeOrders: await filterChangeOrdersForViewer(changeOrders, username, role),
     submissionNames: new Map(linked.map((r) => [r.legacyId, r.submissionName])),
-    bfas,
   });
 
   const asPdf = req.query.format === "pdf";

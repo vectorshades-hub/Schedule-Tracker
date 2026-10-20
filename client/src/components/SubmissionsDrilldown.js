@@ -21,7 +21,7 @@ import { useChangeOrders } from "../hooks/useChangeOrders";
 import { useToast } from "../lib/ToastContext";
 
 const SUBMISSION_TYPES = ["OFA", "FAB", "REAPPROVAL", "REVISION", "FOR REVIEW", "FIELD USE"];
-const EMPTY_FORM = { project: "", submission_name: "", client: "", team: "", submission_type: "", sub_date: "", due_date: "", remarks: "", status_override: "", percentage: 0 };
+const EMPTY_FORM = { project: "", submission_name: "", client: "", team: "", submission_type: "", sub_date: "", due_date: "", remarks: "", status_override: "", percentage: 0, bfa_received_date: "" };
 
 /** Replaces both project_submissions.html and client_submissions.html — `by` selects which. */
 export default function SubmissionsDrilldown({ by, name }) {
@@ -139,6 +139,7 @@ export default function SubmissionsDrilldown({ by, name }) {
       remarks: r.remarks,
       status_override: upper.startsWith("COMPLETED") ? "COMPLETED" : upper === "ON HOLD" ? "ON HOLD" : "",
       percentage: r.percentage ?? 0,
+      bfa_received_date: r.bfa_received_date || "",
     });
     setPendingHold(null);
   }
@@ -509,6 +510,19 @@ export default function SubmissionsDrilldown({ by, name }) {
                 onChange={(e) => setEditForm((f) => ({ ...f, percentage: e.target.value }))}
               />
             </div>
+            {/* Only a completed submission awaits a BFA — until this is set it shows
+                "Waiting for BFA", and after 10 days goes on the Weekly Status report. */}
+            {editForm.status_override === "COMPLETED" && (
+              <div className="col-md-3">
+                <label className="form-label small mb-1">BFA Received Date</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={editForm.bfa_received_date}
+                  onChange={(e) => setEditForm((f) => ({ ...f, bfa_received_date: e.target.value }))}
+                />
+              </div>
+            )}
             <div className="col-12 d-flex justify-content-end gap-2 mt-2">
               <button type="button" className="btn btn-secondary" onClick={() => setEditing(null)}>Cancel</button>
               <button type="submit" className="btn btn-primary">Save</button>

@@ -48,6 +48,7 @@ function rowToRecord(row) {
     percentage: row.percentage ?? 0,
     type_completed: !!row.typeCompleted,
     type_completed_at: row.typeCompletedAt ? new Date(row.typeCompletedAt).toISOString() : "",
+    bfa_received_date: statusEngine.fmtDateOnlyISO(row.bfaReceivedDate),
     hold_text: row.hold ? row.hold.text || "" : "",
     hold_image: row.hold ? row.hold.imageFilename || "" : "",
     hold_ts: row.hold && row.hold.ts ? new Date(row.hold.ts).toISOString() : "",

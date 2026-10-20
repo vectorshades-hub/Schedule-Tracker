@@ -100,10 +100,14 @@ function computeStatus(dueDate, stored = "") {
 }
 
 /** Status string to store when a record is marked COMPLETED. */
-function resolveCompleteStatus(dueDate) {
+/**
+ * Status for a record completed on `completedOn` (default today) — overdue
+ * days are counted up to the completion day, not to whenever it's re-saved.
+ */
+function resolveCompleteStatus(dueDate, completedOn = null) {
   const due = parseDate(dueDate);
   if (due) {
-    const today = todayUTC();
+    const today = parseDate(completedOn) || todayUTC();
     if (due.getTime() < today.getTime()) {
       const days = daysBetween(today, due);
       return { status: `COMPLETED (OVERDUE ${days}d)`, tag: "completed_overdue" };

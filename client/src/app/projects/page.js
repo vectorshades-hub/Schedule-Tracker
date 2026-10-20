@@ -65,8 +65,14 @@ function ClientCard({ name, projects, isUnassigned, open, onToggle, onEditClient
             <div className="pm-project-grid">
               {projects.map((p) => (
                 <div key={p.name} className="pm-project-chip">
-                  <i className="bi bi-folder-fill" />
-                  <span>{p.name}</span>
+                  <a
+                    className="pm-project-chip-link"
+                    href={p.accessible ? `/projects/${encodeURIComponent(p.name)}` : `/no-access?project=${encodeURIComponent(p.name)}`}
+                    title="Open project"
+                  >
+                    <i className="bi bi-folder-fill" />
+                    <span>{p.name}</span>
+                  </a>
                   <span className="pm-project-chip-actions">
                     <button className="pm-icon-btn" title="Rename / move project" onClick={() => onEditProject(p)}>
                       <i className="bi bi-pencil" />

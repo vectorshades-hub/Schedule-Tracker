@@ -19,7 +19,7 @@ const statusEngine = require("./statusEngine");
 const LOGO_PATH = path.join(__dirname, "..", "..", "..", "client", "public", "vs-logo_full.jpg");
 
 // Columns A–H. Most sections pair D:E and G:H into one column each; the BFA
-// section splits them so its date / days columns are narrow and Description wide.
+// section keeps H alone so its days column is narrow and Description (C:G) wide.
 const COL_WIDTHS = [10, 14, 26, 12, 10, 18, 10, 12];
 const LAST_COL = "H";
 
@@ -39,6 +39,10 @@ const MIN_ROWS = { rfis: 8, submissions: 8, changeOrders: 6, bfa: 8, keyActions:
 
 const COMPLETED_TAGS = new Set(["completed", "completed_overdue"]);
 
+// A completed submission still without a BFA receipt date goes on the BFA
+// Tracking section once it's been waiting more than this many days.
+const BFA_WAIT_DAYS = 10;
+
 const SUPPORT_SHEET = "Supportive Document";
 const NO_CO_TEXT = "NIL- No Unapproved CO currently awaiting customer action";
 
@@ -57,8 +61,8 @@ const SECTIONS = {
     cols: [["A", "A", "CO#"], ["B", "B", "Sent Date"], ["C", "F", "Description"], ["G", "H", "Days Awaited", "center"]],
   },
   awaiting: {
-    title: "4. BFA TRACKING",
-    cols: [["A", "A", "TR#"], ["B", "C", "Submission"], ["D", "D", "Submitted date"], ["E", "G", "Description"], ["H", "H", "Days awaited", "center"]],
+    title: "4. BFA / IFA TRACKING",
+    cols: [["A", "A", "TR#"], ["B", "B", "Submitted date"], ["C", "G", "Description"], ["H", "H", "Days awaited", "center"]],
   },
 };
 
@@ -113,12 +117,8 @@ const bySentDate = (a, b) => (statusEngine.parseDate(a.date || a.createdAt) || 0
  * @param {object[]} p.rfis          raw Rfi docs
  * @param {object[]} p.changeOrders  raw ChangeOrder docs (viewer-scoped)
  * @param {Map<number,string>} p.submissionNames  legacyId → submission name
- * @param {{tr: string, submission: string, sent: Date|null, desc: string, days: number|null}[]} p.bfas
- *   the project's open (status "No") BFA tracking entries (models/Bfa.js),
- *   already resolved by routes/projects.js — TR#, submission name, and days
- *   awaited (override or live)
  */
-function buildWeeklyStatusData({ projectName, clientName, createdBy, records, rfis, changeOrders, submissionNames, bfas = [] }) {
+function buildWeeklyStatusData({ projectName, clientName, createdBy, records, rfis, changeOrders, submissionNames }) {
   const date = (d) => statusEngine.parseDate(d);
   const today = statusEngine.todayUTC();
   const pad = (n) => String(n).padStart(2, "0");
@@ -198,8 +198,18 @@ function buildWeeklyStatusData({ projectName, clientName, createdBy, records, rf
       days: daysSince(co.date || co.createdAt),
     }));
 
-  // ── 4. BFA / IFA tracking — the entries added on the project page's BFA panel.
-  const awaiting = bfas.map((b) => ({ tr: /^[1-9]\d{0,14}$/.test(b.tr || "") ? Number(b.tr) : b.tr || "", submission: b.submission, sent: date(b.sent), desc: b.desc, days: b.days }));
+  // ── 4. BFA tracking — completed submissions with no BFA receipt date yet,
+  // waiting more than BFA_WAIT_DAYS since they were marked completed (older
+  // records without a completed date fall back to their submission date).
+  const awaiting = records
+    .filter((r) => COMPLETED_TAGS.has(r.tag) && !r.bfa_received_date)
+    .map((r) => {
+      // "Submitted" = the day it was completed. TR# isn't tracked, so it's left blank.
+      const sentRaw = r.completed_at || r.sub_date_raw || r.due_date_raw;
+      return { sent: date(sentRaw), desc: r.submission_name, days: daysSince(sentRaw) };
+    })
+    .filter((r) => r.days !== null && r.days > BFA_WAIT_DAYS)
+    .sort((a, b) => a.sent - b.sent);
 
   return { header, rfiRows, upcoming, unapproved, awaiting, support };
 }
@@ -393,14 +403,13 @@ async function buildWeeklyStatusWorkbook(data) {
     row++;
   }
 
-  // ── 4. BFA / IFA tracking
+  // ── 4. BFA tracking
   sectionHead(SECTIONS.awaiting);
   for (let i = 0; i < Math.max(MIN_ROWS.bfa, data.awaiting.length); i++) {
     const r = data.awaiting[i];
-    put("A", "A", r?.tr);
-    put("B", "C", r?.submission);
-    put("D", "D", r?.sent, dateFmt);
-    put("E", "G", r?.desc);
+    put("A", "A", null);
+    put("B", "B", r?.sent, dateFmt);
+    put("C", "G", r?.desc);
     put("H", "H", r?.days, center);
     row++;
   }
@@ -571,10 +580,9 @@ function buildWeeklyStatusPdf(data, out) {
   for (let i = 0; i < Math.max(MIN_ROWS.bfa, data.awaiting.length); i++) {
     const r = data.awaiting[i];
     drawRow([
-      cell("A", "A", r?.tr),
-      cell("B", "C", r?.submission),
-      cell("D", "D", fmtShortDate(r?.sent), { align: "right" }),
-      cell("E", "G", r?.desc),
+      cell("A", "A", ""),
+      cell("B", "B", fmtShortDate(r?.sent), { align: "right" }),
+      cell("C", "G", r?.desc),
       cell("H", "H", r?.days, { align: "center" }),
     ]);
   }

@@ -11,7 +11,6 @@ const { Counter, nextSequence, ensureAtLeast } = require("./Counter");
 const ChangeOrder = require("./ChangeOrder");
 const Rfi = require("./Rfi");
 const Issue = require("./Issue");
-const Bfa = require("./Bfa");
 
 module.exports = {
   User,
@@ -31,5 +30,4 @@ module.exports = {
   ChangeOrder,
   Rfi,
   Issue,
-  Bfa,
 };

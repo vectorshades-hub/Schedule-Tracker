@@ -166,6 +166,7 @@ export default function RecordsDashboard() {
       percentage: r.percentage ?? 0,
       billable: r.billable || "",
       invoice_released: r.invoice_released || "",
+      bfa_received_date: r.bfa_received_date || "",
     });
     setPendingHold(null);
   }
@@ -472,6 +473,19 @@ export default function RecordsDashboard() {
                 </select>
               </div>
             )}
+            {/* Only a completed submission awaits a BFA — until this is set it shows
+                "Waiting for BFA", and after 10 days goes on the Weekly Status report. */}
+            {editForm.status_override === "COMPLETED" && (
+              <div className="col-md-2">
+                <label className="form-label small mb-1">BFA Received Date</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={editForm.bfa_received_date || ""}
+                  onChange={(e) => setEditForm((f) => ({ ...f, bfa_received_date: e.target.value }))}
+                />
+              </div>
+            )}
             <div className="col-md-2 d-flex align-items-end gap-2">
               <button type="submit" className="btn btn-primary flex-fill">Save</button>
               <button type="button" className="btn btn-secondary" onClick={() => setEditing(null)}>Cancel</button>
@@ -563,7 +577,7 @@ export default function RecordsDashboard() {
       </div>
 
       <div className="table-wrap table-wrap-page-sticky">
-        <table className="table table-sm mb-0">
+        <table className="table table-sm mb-0 records-table">
           <thead>
             <tr>
               <th>#</th>
