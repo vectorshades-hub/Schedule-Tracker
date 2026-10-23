@@ -20,7 +20,14 @@ const TYPE_PILL_CLASS = {
   "FIELD USE": "type-pill-field",
 };
 const SUBMISSION_TYPES = ["OFA", "FAB", "REAPPROVAL", "REVISION", "FOR REVIEW", "FIELD USE"];
-const STEEL_TYPES = ["Main Steel", "Misc Steel", "Main & Misc Steel"];
+const STEEL_TYPES = [
+  "Main Steel",
+  "Misc Steel",
+  "Main & Misc Steel",
+  "Main Steel - CO",
+  "Misc. Steel - CO",
+  "Main & Misc. Steel - CO",
+];
 
 function TypePill({ type }) {
   return <span className={`type-pill ${TYPE_PILL_CLASS[type] || "type-pill-default"}`}>{type}</span>;

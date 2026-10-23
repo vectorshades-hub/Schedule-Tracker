@@ -27,6 +27,7 @@ router.post("/export", requireRole("admin", "management", "team_lead", "qaqc"), 
   if (b.f_project) records = records.filter((r) => eq(r.project, b.f_project));
   if (b.f_client) records = records.filter((r) => eq(r.client, b.f_client));
   if (b.f_type) records = records.filter((r) => eq(r.submission_type, b.f_type));
+  if (b.f_steel_type) records = records.filter((r) => (b.f_steel_type === "__none__" ? !r.steel_type : eq(r.steel_type, b.f_steel_type)));
   if (b.f_status) records = records.filter((r) => startsWith(r.status, b.f_status));
   if (b.f_created_by) records = records.filter((r) => eq(r.created_by, b.f_created_by));
   if (b.f_billable) records = records.filter((r) => eq(r.billable, b.f_billable));
@@ -42,10 +43,15 @@ router.post("/export", requireRole("admin", "management", "team_lead", "qaqc"), 
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Report");
-  ws.addRow(["ID", "Project", "Submission", "Client", "Type", "Team", "Sub Date", "Due Date", "Remarks", "Status", "QC Done", "Created By", "Created At"]);
+  ws.addRow(["ID", "Project", "Submission", "Client", "Type", "Type of Submission", "Team", "Sub Date", "Due Date", "Remarks", "Status", "Percentage", "QC Done", "Created By", "Created At"]);
   for (const r of records) {
-    ws.addRow([r.id, r.project, r.submission_name, r.client, r.submission_type, r.team, r.sub_date, r.due_date, r.remarks, r.status, r.qaqc, r.created_by, r.created_at]);
+    ws.addRow([
+      r.id, r.project, r.submission_name, r.client, r.submission_type, r.steel_type || "N/A", r.team, r.sub_date, r.due_date, r.remarks, r.status,
+      (Number(r.percentage) || 0) / 100, r.qaqc, r.created_by, r.created_at,
+    ]);
   }
+  // Stored as a fraction with a % format so Excel can still sum/sort it numerically.
+  ws.getColumn(12).numFmt = "0%";
 
   const ts = new Date();
   const pad = (n) => String(n).padStart(2, "0");

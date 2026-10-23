@@ -6,9 +6,17 @@ import { api, ApiError } from "../lib/api";
 import { useToast } from "../lib/ToastContext";
 
 const SUBMISSION_TYPES = ["OFA", "FAB", "REAPPROVAL", "REVISION", "FOR REVIEW", "FIELD USE"];
+const STEEL_TYPES = [
+  "Main Steel",
+  "Misc Steel",
+  "Main & Misc Steel",
+  "Main Steel - CO",
+  "Misc. Steel - CO",
+  "Main & Misc. Steel - CO",
+];
 
 const EMPTY_FORM = {
-  group_by: "project", f_project: "", f_client: "", f_team: "", f_type: "", f_status: "", f_created_by: "",
+  group_by: "project", f_project: "", f_client: "", f_team: "", f_type: "", f_steel_type: "", f_status: "", f_created_by: "",
   f_billable: "", f_invoice_released: "", f_sub_from: "", f_sub_to: "", f_due_from: "", f_due_to: "",
 };
 
@@ -122,6 +130,14 @@ export default function ReportsExportModal({ open, onClose, role }) {
               <option value="">All</option>
               <option value="Yes">Yes</option>
               <option value="No">No</option>
+            </select>
+          </div>
+          <div className="col-md-4">
+            <label className="form-label">Type of Submission</label>
+            <select className="form-select" value={form.f_steel_type} onChange={(e) => set("f_steel_type", e.target.value)}>
+              <option value="">All</option>
+              {STEEL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              <option value="__none__">N/A</option>
             </select>
           </div>
 

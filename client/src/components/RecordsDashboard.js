@@ -25,12 +25,48 @@ import BirthdayPopup from "./BirthdayPopup";
 import { useToast } from "../lib/ToastContext";
 
 const SUBMISSION_TYPES = ["OFA", "FAB", "REAPPROVAL", "REVISION", "FOR REVIEW", "FIELD USE"];
-const STEEL_TYPES = ["Main Steel", "Misc Steel", "Main & Misc Steel"];
+const STEEL_TYPES = [
+  "Main Steel",
+  "Misc Steel",
+  "Main & Misc Steel",
+  "Main Steel - CO",
+  "Misc. Steel - CO",
+  "Main & Misc. Steel - CO",
+];
 // Billable/Invoice Released are intentionally not part of the Add form — a new
 // record always starts as "No" for both (server-side default); they're only
 // ever set afterward from the Edit form, which builds its own explicit object
 // (see openEdit()) rather than spreading this base, so leaving them out here
 // only affects the Add flow.
+// Records table filter bar — keys map to the f_* query params GET /api/records reads.
+const EMPTY_FILTERS = { project: "", client: "", type: "", status: "", steel_type: "", qaqc: "", billable: "", invoice_released: "" };
+// Status filter matches the row's tag prefix server-side ("completed" covers
+// "completed_overdue"; "duesoon" covers DUE TODAY as well).
+const STATUS_FILTERS = [
+  ["overdue", "Overdue"],
+  ["duesoon", "Due Today / Soon"],
+  ["ontrack", "On Track"],
+  ["hold", "On Hold"],
+  ["completed", "Completed"],
+  ["nodue", "No Due Date"],
+];
+// Every records-table column header that sorts on click — [sort key, label].
+const SORT_COLUMNS = [
+  ["project", "Project"],
+  ["submission", "Submission"],
+  ["client", "Client"],
+  ["type", "Type"],
+  ["team", "Team"],
+  ["sub_date", "Sub Date"],
+  ["due_date", "Due Date"],
+  ["remarks", "Remarks"],
+  ["status", "Status"],
+  ["steel_type", "Type of Submission"],
+  ["percentage", "Percentage"],
+  ["qaqc", "QA Done"],
+  ["billable", "Billable"],
+  ["invoice_released", "Invoice Released"],
+];
 const EMPTY_FORM = { project: "", submission_name: "", client: "", team: "", submission_type: "", steel_type: "", sub_date: "", due_date: "", remarks: "", status_override: "", percentage: 0, billable: "No", invoice_released: "" };
 
 /** yyyy-MM-dd in local time, matching what <input type="date"> expects. */
@@ -94,8 +130,11 @@ export default function RecordsDashboard() {
   const [sort, setSort] = useState({ col: "", dir: "asc" });
   const [dates, setDates] = useState([]);
   const [customRange, setCustomRange] = useState({ from: "", to: "" });
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   const queryParams = {
+    ...Object.fromEntries(Object.entries(filters).map(([k, v]) => [`f_${k}`, v])),
     page,
     search,
     teams: (selectedTeams || []).join(","),
@@ -266,6 +305,16 @@ export default function RecordsDashboard() {
 
   function clearCustomRange() {
     setCustomRange({ from: "", to: "" });
+    setPage(1);
+  }
+
+  function setFilter(key, value) {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+    setPage(1);
+  }
+
+  function clearFilters() {
+    setFilters(EMPTY_FILTERS);
     setPage(1);
   }
 
@@ -576,31 +625,55 @@ export default function RecordsDashboard() {
         </div>
       </div>
 
+      <div className="records-filter-bar d-flex flex-wrap gap-2 align-items-center mb-2">
+        <span className="small text-muted fw-semibold"><i className="bi bi-funnel" /> Filters</span>
+        <div style={{ width: 200 }}>
+          <SearchableDropdown strict value={filters.project} onChange={(v) => setFilter("project", v)} options={meta.projects} placeholder="All projects" className="form-control form-control-sm" />
+        </div>
+        <div style={{ width: 180 }}>
+          <SearchableDropdown strict value={filters.client} onChange={(v) => setFilter("client", v)} options={meta.clients} placeholder="All clients" className="form-control form-control-sm" />
+        </div>
+        <select className="form-select form-select-sm" style={{ width: "auto" }} value={filters.type} onChange={(e) => setFilter("type", e.target.value)}>
+          <option value="">All types</option>
+          {SUBMISSION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <select className="form-select form-select-sm" style={{ width: "auto" }} value={filters.status} onChange={(e) => setFilter("status", e.target.value)}>
+          <option value="">All statuses</option>
+          {STATUS_FILTERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+        <select className="form-select form-select-sm" style={{ width: "auto" }} value={filters.steel_type} onChange={(e) => setFilter("steel_type", e.target.value)}>
+          <option value="">All submission types</option>
+          {STEEL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          <option value="__none__">N/A</option>
+        </select>
+        {[
+          ["qaqc", "QA Done"],
+          ["billable", "Billable"],
+          ["invoice_released", "Invoice Released"],
+        ].map(([key, label]) => (
+          <select key={key} className="form-select form-select-sm" style={{ width: "auto" }} value={filters[key]} onChange={(e) => setFilter(key, e.target.value)}>
+            <option value="">{label}: Any</option>
+            <option value="Yes">{label}: Yes</option>
+            <option value="No">{label}: No</option>
+          </select>
+        ))}
+        {activeFilterCount > 0 && (
+          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearFilters}>
+            <i className="bi bi-x-circle" /> Clear filters ({activeFilterCount})
+          </button>
+        )}
+      </div>
+
       <div className="table-wrap table-wrap-page-sticky">
         <table className="table table-sm mb-0 records-table">
           <thead>
             <tr>
               <th>#</th>
-              {[
-                ["project", "Project"],
-                ["submission", "Submission"],
-                ["client", "Client"],
-                ["type", "Type"],
-                ["team", "Team"],
-                ["sub_date", "Sub Date"],
-                ["due_date", "Due Date"],
-              ].map(([key, label]) => (
-                <th key={key} onClick={() => toggleSort(key)}>
+              {SORT_COLUMNS.map(([key, label]) => (
+                <th key={key} onClick={() => toggleSort(key)} style={{ cursor: "pointer" }}>
                   {label} {sort.col === key ? (sort.dir === "asc" ? "▲" : "▼") : "⇅"}
                 </th>
               ))}
-              <th>Remarks</th>
-              <th onClick={() => toggleSort("status")}>Status {sort.col === "status" ? (sort.dir === "asc" ? "▲" : "▼") : "⇅"}</th>
-              <th>Type of Submission</th>
-              <th>Percentage</th>
-              <th>QA Done</th>
-              <th>Billable</th>
-              <th>Invoice Released</th>
               <th>Actions</th>
             </tr>
           </thead>

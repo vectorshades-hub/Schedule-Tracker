@@ -165,6 +165,19 @@ router.get("/", requireAuth, async (req, res) => {
   const datesStr = String(req.query.dates || "");
   const dateFrom = String(req.query.date_from || "").trim();
   const dateTo = String(req.query.date_to || "").trim();
+  // Column filters from the dashboard's filter bar — each is an exact match
+  // (status matches on the row's tag group, e.g. "completed" covers
+  // "completed_overdue" too); an empty value means "any".
+  const filters = {
+    project: String(req.query.f_project || "").trim(),
+    client: String(req.query.f_client || "").trim(),
+    type: String(req.query.f_type || "").trim(),
+    status: String(req.query.f_status || "").trim(),
+    steel_type: String(req.query.f_steel_type || "").trim(),
+    qaqc: String(req.query.f_qaqc || "").trim(),
+    billable: String(req.query.f_billable || "").trim(),
+    invoice_released: String(req.query.f_invoice_released || "").trim(),
+  };
   const PAGE_SIZE = 100;
 
   const selectedTeams = teamsStr
@@ -209,6 +222,20 @@ router.get("/", requireAuth, async (req, res) => {
     );
   }
 
+  // "No" also matches blank — new records leave QA Done/Invoice Released
+  // unset, and the toggles render blank the same as "No".
+  const yesNo = (v, want) => (want === "Yes" ? v === "Yes" : v !== "Yes");
+  if (filters.project) records = records.filter((r) => r.project === filters.project);
+  if (filters.client) records = records.filter((r) => r.client === filters.client);
+  if (filters.type) records = records.filter((r) => r.submission_type === filters.type);
+  if (filters.status) records = records.filter((r) => r.tag.startsWith(filters.status));
+  if (filters.steel_type) {
+    records = records.filter((r) => (filters.steel_type === "__none__" ? !r.steel_type : r.steel_type === filters.steel_type));
+  }
+  if (filters.qaqc) records = records.filter((r) => yesNo(r.qaqc, filters.qaqc));
+  if (filters.billable) records = records.filter((r) => yesNo(r.billable, filters.billable));
+  if (filters.invoice_released) records = records.filter((r) => yesNo(r.invoice_released, filters.invoice_released));
+
   const sortKeys = {
     project: (r) => r.project.toLowerCase(),
     submission: (r) => r.submission_name.toLowerCase(),
@@ -217,7 +244,13 @@ router.get("/", requireAuth, async (req, res) => {
     team: (r) => r.team.toLowerCase(),
     sub_date: (r) => r.sub_date_raw || "",
     due_date: (r) => r.due_date_raw || "",
+    remarks: (r) => (r.remarks || "").toLowerCase(),
     status: (r) => r.status.toLowerCase(),
+    steel_type: (r) => (r.steel_type || "").toLowerCase(),
+    percentage: (r) => Number(r.percentage) || 0,
+    qaqc: (r) => (r.qaqc === "Yes" ? 1 : 0),
+    billable: (r) => (r.billable === "Yes" ? 1 : 0),
+    invoice_released: (r) => (r.invoice_released === "Yes" ? 1 : 0),
   };
   if (sortKeys[sortCol]) {
     const keyFn = sortKeys[sortCol];

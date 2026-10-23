@@ -16,7 +16,7 @@ const recordSchema = new mongoose.Schema({
   submissionName: { type: String, required: true },
   client: { type: String, required: true },
   submissionType: { type: String, required: true },
-  steelType: { type: String, default: "" }, // "Main Steel" | "Misc Steel" | "Main & Misc Steel" | ""
+  steelType: { type: String, default: "" }, // "Main Steel" | "Misc Steel" | "Main & Misc Steel" | "... - CO" variants | ""
   team: { type: String, required: true, index: true },
   subDate: { type: Date, default: null },
   dueDate: { type: Date, default: null },
